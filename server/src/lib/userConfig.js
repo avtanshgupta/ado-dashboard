@@ -141,7 +141,7 @@ export function loadUserConfig(userId) {
 const ALLOWED_KEYS = [
   'projects', 'repositories', 'repoProjects', 'team', 'reviewerGroups', 'defaultTimeRangeMonths', 'pipelines', 'notificationPrefs',
   'commentTemplates', 'savedViews', 'mutedRepos', 'uiPrefs', 'slaDays',
-  'workItemSavedQueries',
+  'workItemSavedQueries', 'planning',
 ];
 
 const KNOWN_PREF_KEYS = new Set(Object.keys(DEFAULT_NOTIF_PREFS));

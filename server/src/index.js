@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { config } from './config.js';
 import apiRouter from './routes/api.js';
 import authRouter from './routes/auth.js';
+import planningRouter from './routes/planning.js';
 import { sessionContext, warmIdentity } from './middleware/sessionContext.js';
 import { csrfGuard } from './middleware/csrf.js';
 import { securityHeaders } from './middleware/securityHeaders.js';
@@ -56,6 +57,9 @@ app.use('/api/auth', authRouter);
 // Every /api request runs in an authenticated session context, and any
 // state-changing call must carry the CSRF header.
 app.use('/api', csrfGuard, sessionContext, apiRouter);
+
+// Planning routes (also behind session context + CSRF).
+app.use('/api/planning', csrfGuard, sessionContext, planningRouter);
 
 // Serve the built frontend when present (production / single-process mode).
 const webDist = join(config.serverRoot, '..', 'web', 'dist');

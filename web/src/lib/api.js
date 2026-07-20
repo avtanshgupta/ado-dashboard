@@ -137,4 +137,24 @@ export const api = {
   setPrefs: (prefs) => req('/notifications/preferences', { method: 'PUT', body: prefs }),
 
   exportUrl: (category, status) => `${BASE}/export.csv?category=${category}${status ? `&status=${status}` : ''}`,
+
+  // --- Planning ---
+  planningSettings: () => req('/planning/settings'),
+  updatePlanningSettings: (settings) => req('/planning/settings', { method: 'PUT', body: settings }),
+  planningConnect: () => req('/planning/connect', { method: 'POST' }),
+  weeklyGoals: (weekStart) => req(`/planning/weekly${weekStart ? `?weekStart=${weekStart}` : ''}`),
+  createWeeklyGoal: (goal) => req('/planning/weekly', { method: 'POST', body: goal }),
+  updateWeeklyGoal: (id, updates) => req(`/planning/weekly/${id}`, { method: 'PATCH', body: updates }),
+  deleteWeeklyGoal: (id) => req(`/planning/weekly/${id}`, { method: 'DELETE' }),
+  breakdownWeeklyGoal: (id, dailyTasks) => req(`/planning/weekly/${id}/breakdown`, { method: 'POST', body: { dailyTasks } }),
+  dailyTasks: (date) => req(`/planning/daily${date ? `?date=${date}` : ''}`),
+  createDailyTask: (task) => req('/planning/daily', { method: 'POST', body: task }),
+  updateDailyTask: (id, updates) => req(`/planning/daily/${id}`, { method: 'PATCH', body: updates }),
+  deleteDailyTask: (id) => req(`/planning/daily/${id}`, { method: 'DELETE' }),
+  carryForwardTasks: (fromDate, toDate) => req('/planning/daily/carry-forward', { method: 'POST', body: { fromDate, toDate } }),
+  planningSummary: (date) => req(`/planning/summary${date ? `?date=${date}` : ''}`),
+  aiStatus: () => req('/planning/ai/status'),
+  aiParse: (input, context) => req('/planning/ai/parse', { method: 'POST', body: { input, context } }),
+  aiGeneratePlan: (input, existingTasks) => req('/planning/ai/generate-plan', { method: 'POST', body: { input, existingTasks } }),
+  aiBreakdown: (goalTitle, weekStart) => req('/planning/ai/breakdown', { method: 'POST', body: { goalTitle, weekStart } }),
 };

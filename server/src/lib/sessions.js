@@ -134,6 +134,23 @@ export function getVaultToken(userId) {
   return vault.get(userId) || null;
 }
 
+// --- Microsoft Graph token vault (separate from ADO token) ---
+const graphVault = new Map();
+
+export function putGraphToken(userId, token, expiresAt) {
+  graphVault.set(userId, { token, expiresAt });
+}
+
+export function getGraphToken(userId) {
+  const entry = graphVault.get(userId);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    graphVault.delete(userId);
+    return null;
+  }
+  return entry;
+}
+
 export function createSession(user) {
   const sid = randomBytes(24).toString('hex');
   const now = Date.now();

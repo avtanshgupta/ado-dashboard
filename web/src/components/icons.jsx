@@ -88,4 +88,11 @@ export {
   // onboarding tour
   Compass,
   Rocket,
+  // planning
+  Target,
+  Calendar,
+  AlertCircle,
+  ArrowRight,
+  Edit3,
+  Send,
 } from 'lucide-react';
