@@ -32,6 +32,18 @@ export {
   LineChart,
   Activity,
   Dices,
+  // work items
+  ClipboardList,
+  ListTodo,
+  CalendarClock,
+  ListFilter,
+  Bug,
+  Link2,
+  SquarePen,
+  Layers,
+  Flag,
+  CircleUser,
+  SlidersHorizontal,
   // content / status
   MessageSquare,
   Inbox,

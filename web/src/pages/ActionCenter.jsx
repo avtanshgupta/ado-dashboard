@@ -148,7 +148,7 @@ function StandupModal({ onClose }) {
 export function ActionCenter() {
   useConfig();
   const toast = useToast();
-  const { data, loading, error, refetch } = useAsync(() => api.actionCenter(), [], { pollMs: 90000 });
+  const { data, loading, error, refetch } = useAsync(() => api.actionCenter(), [], { pollMs: 90000, cacheKey: 'action-center' });
   const [mergeTarget, setMergeTarget] = useState(null);
   const [showStandup, setShowStandup] = useState(false);
 

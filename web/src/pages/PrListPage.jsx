@@ -113,13 +113,13 @@ export function PrListPage({ variant }) {
     filters.states.length > 0 && filters.states.every((s) => s === 'Open' || s === 'Draft');
   const fetchArg = variant === 'created' && cfg.historyByState && !activeOnly ? 'all' : undefined;
 
-  const { data, loading, error, refetch } = useAsync(
+  const { data, loading, error, refetch, revalidating } = useAsync(
     () => cfg.fetch(fetchArg),
     [variant, fetchArg],
-    { pollMs: 90000 }
+    { pollMs: 90000, cacheKey: `pr:list:${variant}:${fetchArg || 'active'}` }
   );
 
-  const prs = data || [];
+  const prs = useMemo(() => data || [], [data]);
   const shown = useMemo(() => applyFilterSort(prs, filters, sort), [prs, filters, sort]);
   const availableLabels = useMemo(() => {
     const set = new Set();
@@ -211,6 +211,7 @@ export function PrListPage({ variant }) {
         onRefresh={handleRefresh}
         showStateFilter={cfg.showStateFilter}
         labels={availableLabels}
+        revalidating={revalidating}
         extra={
           <SavedViews
             variant={variant}

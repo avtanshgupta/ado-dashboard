@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useConfig, useApp } from '../lib/AppContext.jsx';
 import { useToast } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
-import { Settings as SettingsIcon, Save, X } from '../components/icons.jsx';
+import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser } from '../components/icons.jsx';
 
 /**
  * Tag input that searches Azure DevOps users as you type (by alias or email) and
@@ -100,8 +100,21 @@ const PREF_LABELS = {
   pipelineSucceeded: 'Pipeline successes',
   prClosed: 'PR merged or closed',
   browserPush: 'Desktop / browser notifications',
-  email: 'Also send notifications by email',
 };
+
+/** Short org label from an org base URL: dev.azure.com/{org} or {org}.visualstudio.com. */
+function orgLabel(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    if (host === 'dev.azure.com') return u.pathname.split('/').filter(Boolean)[0] || host;
+    const vs = host.match(/^(.+)\.visualstudio\.com$/);
+    if (vs) return vs[1];
+    return host;
+  } catch {
+    return '';
+  }
+}
 
 export function Settings() {
   const config = useConfig();
@@ -111,8 +124,10 @@ export function Settings() {
   const [repos, setRepos] = useState(config.repositories);
   const [repoProjects, setRepoProjects] = useState(config.repoProjects || {});
   const [repoRef, setRepoRef] = useState('');
-  const [repoDraft, setRepoDraft] = useState('');
   const [repoResolving, setRepoResolving] = useState(false);
+  const [projects, setProjects] = useState(config.projects || []);
+  const [projectLink, setProjectLink] = useState('');
+  const [projectResolving, setProjectResolving] = useState(false);
   const [team, setTeam] = useState(config.team);
   const [groups, setGroups] = useState(config.reviewerGroups || []);
   const [months, setMonths] = useState(config.defaultTimeRangeMonths || 6);
@@ -123,12 +138,14 @@ export function Settings() {
   const [prefs, setPrefs] = useState(config.notificationPrefs || {});
   const [templates, setTemplates] = useState(config.commentTemplates || []); // A4
   const [slaDays, setSlaDays] = useState(config.slaDays || 7); // B4
-  const [webhooks, setWebhooks] = useState(config.chatWebhooks || []); // D1
-  const [testingHook, setTestingHook] = useState(null);
   const [density, setDensity] = useState(config.uiPrefs?.density || 'comfortable'); // E5
+  const [wiQueries, setWiQueries] = useState(config.workItemSavedQueries || []); // WI
+  const [wiQueryLink, setWiQueryLink] = useState('');
+  const [wiQueryResolving, setWiQueryResolving] = useState(false);
   const [aliasDraft, setAliasDraft] = useState('');
   const [resolving, setResolving] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [section, setSection] = useState('general');
 
   // Load names for the currently configured pipelines (for display).
   useEffect(() => {
@@ -144,14 +161,14 @@ export function Settings() {
     if (!ref) return;
     setRepoResolving(true);
     try {
-      const info = await api.repoResolve(ref); // { repo, project, projectId, ... }
+      const info = await api.repoResolve(ref); // { repo, project, projectId, org, ... }
       const already = repos.some((r) => r.toLowerCase() === info.repo.toLowerCase());
       const nextRepos = already ? repos : [...repos, info.repo];
-      // Record the repo's owning project so its PRs show alongside every other
-      // project's in the same lists (no active-project switching).
+      // Record the repo's owning project + org so its PRs show alongside every
+      // other project's in the same lists (across organizations).
       const nextRepoProjects = {
         ...repoProjects,
-        [info.repo.toLowerCase()]: { project: info.project, projectId: info.projectId || '' },
+        [info.repo.toLowerCase()]: { project: info.project, projectId: info.projectId || '', ...(info.org ? { org: info.org } : {}) },
       };
 
       // Persist immediately so tracking starts right away.
@@ -216,16 +233,43 @@ export function Settings() {
     }
   }
 
-  async function testHook(i) {
-    const w = webhooks[i];
-    setTestingHook(i);
+  async function addProjectByLink() {
+    const ref = projectLink.trim();
+    if (!ref) return;
+    setProjectResolving(true);
     try {
-      await api.testWebhook(w.url, w.type);
-      toast.success('Test message sent — check your channel');
+      const info = await api.projectResolve(ref); // { name, id, url }
+      if (projects.some((p) => p.name.toLowerCase() === info.name.toLowerCase())) {
+        toast.info(`“${info.name}” is already monitored`);
+      } else {
+        setProjects([...projects, { name: info.name, id: info.id, url: info.url }]);
+        toast.success(`Now monitoring project “${info.name}”`);
+      }
+      setProjectLink('');
     } catch (e) {
-      toast.error(`Webhook test failed: ${e.message}`);
+      toast.error(e.message);
     } finally {
-      setTestingHook(null);
+      setProjectResolving(false);
+    }
+  }
+
+  async function addQueryByLink() {
+    const ref = wiQueryLink.trim();
+    if (!ref) return;
+    setWiQueryResolving(true);
+    try {
+      const info = await api.wiResolveQuery(ref); // { id, name, project, org }
+      if (wiQueries.some((q) => (q.id || '').toLowerCase() === info.id.toLowerCase())) {
+        toast.info(`“${info.name}” is already added`);
+      } else {
+        setWiQueries([...wiQueries, { id: info.id, name: info.name, ...(info.project ? { project: info.project } : {}), ...(info.org ? { org: info.org } : {}) }]);
+        toast.success(`Added query “${info.name}”`);
+      }
+      setWiQueryLink('');
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setWiQueryResolving(false);
     }
   }
 
@@ -233,6 +277,7 @@ export function Settings() {
     setBusy(true);
     try {
       await api.updateConfig({
+        projects,
         repositories: repos,
         repoProjects,
         team,
@@ -242,8 +287,8 @@ export function Settings() {
         notificationPrefs: prefs,
         commentTemplates: templates.filter((t) => t.name.trim() && t.body.trim()),
         slaDays: Number(slaDays),
-        chatWebhooks: webhooks.filter((w) => /^https:\/\//i.test((w.url || '').trim())),
         uiPrefs: { density },
+        workItemSavedQueries: wiQueries.filter((q) => (q.id || '').trim()),
       });
       await reloadConfig();
       toast.success('Settings saved');
@@ -254,247 +299,297 @@ export function Settings() {
     }
   }
 
+  const SECTIONS = [
+    { id: 'general', label: 'General', Icon: SlidersHorizontal },
+    { id: 'team', label: 'Team & Reviewers', Icon: Users },
+    { id: 'pipelines', label: 'Pipelines', Icon: Workflow },
+    { id: 'workitems', label: 'Work Items', Icon: ClipboardList },
+    { id: 'notifications', label: 'Notifications', Icon: Bell },
+    { id: 'templates', label: 'Comment templates', Icon: MessageSquare },
+    { id: 'account', label: 'Account', Icon: CircleUser },
+  ];
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 10, flexWrap: 'wrap' }}>
         <h2 className="section-title" style={{ margin: 0 }}><SettingsIcon size={20} /> Settings</h2>
         <button className="btn primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : <><Save size={15} /> Save changes</>}</button>
       </div>
 
-      <div className="grid cols-2">
-        <div>
-          <div className="card card-pad" style={{ marginBottom: 16 }} data-tour="settings-repos">
-            <h3>Repositories to monitor ({repos.length})</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-              Paste a repo <strong>URL</strong> (<code>…/_git/&lt;repo&gt;</code>) from <strong>any project</strong> —
-              the name and project are filled in automatically and tracking starts. Repos from every project
-              appear together in the same lists.
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <input
-                value={repoRef}
-                onChange={(e) => setRepoRef(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRepoByLink(); } }}
-                placeholder="Repository URL or name"
-                style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6 }}
-              />
-              <button className="btn accent" onClick={addRepoByLink} disabled={repoResolving || !repoRef.trim()}>
-                {repoResolving ? 'Verifying…' : '+ Add'}
-              </button>
-            </div>
-            <div className="tag-input">
-              {repos.map((r) => {
-                const proj = repoProjects[r.toLowerCase()]?.project;
-                const crossProject = proj && proj !== config.project;
-                return (
-                  <span className="tag" key={r} title={proj ? `${r} · ${proj}` : r}>
-                    {r}
-                    {crossProject && <span style={{ opacity: 0.65, marginLeft: 4 }}>· {proj}</span>}
-                    <button
-                      type="button"
-                      onClick={() => setRepos(repos.filter((x) => x !== r))}
-                      title="Remove"
-                    ><X size={12} /></button>
-                  </span>
-                );
-              })}
-              <input
-                value={repoDraft}
-                onChange={(e) => setRepoDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ',') {
-                    e.preventDefault();
-                    const vals = repoDraft.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
-                    if (vals.length) setRepos([...new Set([...repos, ...vals])]);
-                    setRepoDraft('');
-                  }
-                }}
-                placeholder={`Add a name in ${config.project} + Enter`}
-              />
-            </div>
-          </div>
-
-          <div className="card card-pad" style={{ marginBottom: 16 }}>
-            <h3>Team members ({team.length})</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Their open PRs appear under “Authored By Team”. Search by alias or email, then pick.</div>
-            <MemberSearch items={team} onChange={setTeam} placeholder="Search by alias or email…" />
-          </div>
-
-          <div className="card card-pad">
-            <h3>Default time window</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Default “updated within” filter for lists & overview.</div>
-            <select value={months} onChange={(e) => setMonths(e.target.value)} style={{ padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6 }}>
-              {[1, 3, 6, 12, 24].map((m) => <option key={m} value={m}>{m === 12 ? '1 year' : m === 24 ? '2 years' : `${m} months`}</option>)}
-            </select>
-            <h3 style={{ marginTop: 16 }}>Staleness SLA</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Open PRs idle this many days are flagged as breaching SLA in Analytics & Action Center.</div>
-            <input
-              type="number"
-              min={1}
-              max={90}
-              value={slaDays}
-              onChange={(e) => setSlaDays(e.target.value)}
-              style={{ padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6, width: 100 }}
-            /> <span className="muted" style={{ fontSize: 13 }}>days</span>
-            <h3 style={{ marginTop: 16 }}>Table density</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Compact mode fits more rows per screen in PR lists.</div>
-            <select value={density} onChange={(e) => setDensity(e.target.value)} style={{ padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6 }}>
-              <option value="comfortable">Comfortable</option>
-              <option value="compact">Compact</option>
-            </select>
-          </div>
-
-          <div className="card card-pad" style={{ marginTop: 16 }}>
-            <h3>Pipelines to monitor ({pipelines.length})</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-              Paste an ADO pipeline <strong>URL</strong> (<code>…/_build?definitionId=NNN</code>) or just the
-              <strong> definitionId</strong>. The name is filled in automatically.
-            </div>
-            {pipelines.map((p, i) => (
-              <div className="group-row" key={`${p.definitionId}`}>
-                <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {p.name || plNames[p.definitionId] || `Pipeline ${p.definitionId}`}
-                </span>
-                <span title={p.repo} style={{ fontSize: 12, color: 'var(--text-muted)' }}>#{p.definitionId} · {p.repo || '—'}</span>
-                <button className="btn sm" onClick={() => setPipelines(pipelines.filter((_, j) => j !== i))}>Remove</button>
-              </div>
-            ))}
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <input
-                value={plRef}
-                onChange={(e) => setPlRef(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') addPipeline(); }}
-                placeholder="Pipeline URL or definitionId"
-                style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6 }}
-              />
-              <button className="btn accent" onClick={addPipeline} disabled={plResolving || !plRef.trim()}>
-                {plResolving ? 'Resolving…' : '+ Add'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <div className="card card-pad" style={{ marginBottom: 16 }}>
-            <h3>Review-group aliases for “Assigned to Me”</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-              PRs where any of these groups is a reviewer also appear under Assigned to Me.
-            </div>
-            {groups.map((g, i) => (
-              <div className="group-row" key={g.name}>
-                <input value={g.label} onChange={(e) => { const n = [...groups]; n[i] = { ...g, label: e.target.value }; setGroups(n); }} placeholder="Badge label" />
-                <span title={g.name} style={{ fontSize: 12.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</span>
-                <button className="btn sm" onClick={() => setGroups(groups.filter((x) => x.name !== g.name))}>Remove</button>
-              </div>
-            ))}
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <input
-                value={aliasDraft}
-                onChange={(e) => setAliasDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') addAlias(); }}
-                placeholder="group-alias@microsoft.com"
-                style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6 }}
-              />
-              <button className="btn accent" onClick={addAlias} disabled={resolving || !aliasDraft.trim()}>
-                {resolving ? 'Resolving…' : '+ Add'}
-              </button>
-            </div>
-          </div>
-
-          <div className="card card-pad" style={{ marginBottom: 16 }}>
-            <h3>Notification preferences</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-              In-app notifications poll automatically. Email requires server SMTP ({config.emailEnabled ? 'enabled' : 'disabled'}).
-            </div>
-            {Object.entries(PREF_LABELS).map(([key, label]) => (
-              <div className="check-row" key={key}>
-                <input type="checkbox" id={key} checked={!!prefs[key]} onChange={() => setPrefs({ ...prefs, [key]: !prefs[key] })} disabled={key === 'email' && !config.emailEnabled} />
-                <label htmlFor={key} style={{ margin: 0 }}>{label}{key === 'email' && !config.emailEnabled && <span className="muted"> (configure SMTP)</span>}</label>
-              </div>
-            ))}
-            <div className="check-row" style={{ marginTop: 8 }}>
-              <label htmlFor="digest" style={{ margin: 0, marginRight: 8 }}>Digest email</label>
-              <select
-                id="digest"
-                value={prefs.digest || 'off'}
-                onChange={(e) => setPrefs({ ...prefs, digest: e.target.value })}
-                disabled={!config.emailEnabled}
-                style={{ padding: '5px 9px', border: '1px solid var(--border)', borderRadius: 6 }}
-              >
-                <option value="off">Off</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-              </select>
-              {!config.emailEnabled && <span className="muted" style={{ marginLeft: 8 }}>(configure SMTP)</span>}
-            </div>
-          </div>
-
-          <div className="card card-pad" style={{ marginBottom: 16 }}>
-            <h3>Comment templates ({templates.length})</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-              Saved reply snippets you can insert into any PR comment or inline review comment.
-            </div>
-            {templates.map((t, i) => (
-              <div key={t.id || i} className="tmpl-edit" style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border-muted)' }}>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-                  <input
-                    value={t.name}
-                    onChange={(e) => { const n = [...templates]; n[i] = { ...t, name: e.target.value }; setTemplates(n); }}
-                    placeholder="Template name"
-                    style={{ flex: 1, padding: '6px 9px', border: '1px solid var(--border)', borderRadius: 6 }}
-                  />
-                  <button className="btn sm" onClick={() => setTemplates(templates.filter((_, j) => j !== i))}>Remove</button>
-                </div>
-                <textarea
-                  value={t.body}
-                  onChange={(e) => { const n = [...templates]; n[i] = { ...t, body: e.target.value }; setTemplates(n); }}
-                  placeholder="Template body (Markdown supported)"
-                  rows={2}
-                  style={{ width: '100%', padding: '6px 9px', border: '1px solid var(--border)', borderRadius: 6, resize: 'vertical', fontSize: 13 }}
-                />
-              </div>
-            ))}
-            <button className="btn sm accent" onClick={() => setTemplates([...templates, { id: `t${Date.now()}`, name: '', body: '' }])}>+ Add template</button>
-          </div>
-
-          <div className="card card-pad" style={{ marginBottom: 16 }}>
-            <h3>Chat webhooks ({webhooks.length})</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-              Post notifications to Slack or Microsoft Teams via an incoming-webhook URL. Enable the
-              “Send to chat webhooks” toggle below to fan out.
-            </div>
-            <div className="check-row" style={{ marginBottom: 10 }}>
-              <input type="checkbox" id="chatPref" checked={!!prefs.chat} onChange={() => setPrefs({ ...prefs, chat: !prefs.chat })} />
-              <label htmlFor="chatPref" style={{ margin: 0 }}>Send notifications to chat webhooks</label>
-            </div>
-            {webhooks.map((w, i) => (
-              <div key={w.id || i} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border-muted)' }}>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-                  <select value={w.type} onChange={(e) => { const n = [...webhooks]; n[i] = { ...w, type: e.target.value }; setWebhooks(n); }} style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 6 }}>
-                    <option value="slack">Slack</option>
-                    <option value="teams">Teams</option>
-                  </select>
-                  <input value={w.name || ''} onChange={(e) => { const n = [...webhooks]; n[i] = { ...w, name: e.target.value }; setWebhooks(n); }} placeholder="Label" style={{ flex: 1, padding: '6px 9px', border: '1px solid var(--border)', borderRadius: 6 }} />
-                  <button className="btn sm" disabled={testingHook === i || !/^https:\/\//i.test(w.url || '')} onClick={() => testHook(i)}>{testingHook === i ? 'Testing…' : 'Test'}</button>
-                  <button className="btn sm" onClick={() => setWebhooks(webhooks.filter((_, j) => j !== i))}>Remove</button>
-                </div>
-                <input value={w.url} onChange={(e) => { const n = [...webhooks]; n[i] = { ...w, url: e.target.value }; setWebhooks(n); }} placeholder="https://hooks.slack.com/… or https://outlook.office.com/webhook/…" style={{ width: '100%', padding: '6px 9px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12.5 }} />
-              </div>
-            ))}
-            <button className="btn sm accent" onClick={() => setWebhooks([...webhooks, { id: `w${Date.now()}`, type: 'slack', name: '', url: '' }])}>+ Add webhook</button>
-          </div>
-
-          <div className="card card-pad">
-            <h3>Account</h3>
-            <div className="kv"><span className="k">Signed in as</span><span className="v">{config.me.displayName}</span></div>
-            <div className="kv"><span className="k">Email</span><span className="v">{config.me.uniqueName}</span></div>
-            <div className="kv"><span className="k">Organization</span><span className="v">{config.organizationUrl.replace('https://', '')}</span></div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>
-              You act with your own Azure DevOps permissions. Settings on this page are personal to you.
-            </div>
-          </div>
-        </div>
+      <div className="subtabs no-print" data-tour="settings-nav">
+        {SECTIONS.map((s) => (
+          <button key={s.id} type="button" className={`subtab ${section === s.id ? 'active' : ''}`} onClick={() => setSection(s.id)}>
+            <s.Icon size={15} /> {s.label}
+          </button>
+        ))}
       </div>
+
+      <div className="settings-content">
+          {section === 'general' && (
+            <>
+              <div className="card card-pad" style={{ marginBottom: 16 }} data-tour="settings-projects">
+                <h3 className="settings-section-head">Projects to monitor ({projects.length})</h3>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                  All data — pull requests, builds, repos, work items and queries — is scoped to these
+                  Azure DevOps projects. Paste a project <strong>URL</strong>
+                  (<code>https://…/&lt;project&gt;</code>) to add one; its name and id are verified automatically.
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <input
+                    value={projectLink}
+                    onChange={(e) => setProjectLink(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addProjectByLink(); } }}
+                    placeholder="Project URL (…/<org>/<project>)"
+                    style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6 }}
+                  />
+                  <button className="btn accent" onClick={addProjectByLink} disabled={projectResolving || !projectLink.trim()}>
+                    {projectResolving ? 'Verifying…' : '+ Add'}
+                  </button>
+                </div>
+                <div className="tag-input">
+                  {projects.map((p) => (
+                    <span className="tag" key={p.name} title={p.url || p.name}>
+                      {p.name}
+                      <span style={{ opacity: 0.65, marginLeft: 4 }}>· {orgLabel(p.org || p.url)}</span>
+                      <button type="button" onClick={() => setProjects(projects.filter((x) => x.name !== p.name))} title="Remove"><X size={12} /></button>
+                    </span>
+                  ))}
+                  {projects.length === 0 && <span className="muted" style={{ fontSize: 12, padding: '4px 2px' }}>No projects — add at least one to populate the dashboard.</span>}
+                </div>
+              </div>
+
+              <div className="card card-pad" style={{ marginBottom: 16 }} data-tour="settings-repos">
+                <h3 className="settings-section-head">Repositories to monitor ({repos.length})</h3>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                  Paste a repo <strong>URL</strong> (<code>…/_git/&lt;repo&gt;</code>) from any monitored project —
+                  the name and project are filled in automatically and tracking starts. Repos from every project
+                  appear together in the same lists.
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <input
+                    value={repoRef}
+                    onChange={(e) => setRepoRef(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRepoByLink(); } }}
+                    placeholder="Repository URL (…/_git/<repo>)"
+                    style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6 }}
+                  />
+                  <button className="btn accent" onClick={addRepoByLink} disabled={repoResolving || !repoRef.trim()}>
+                    {repoResolving ? 'Verifying…' : '+ Add'}
+                  </button>
+                </div>
+                <div className="tag-input">
+                  {repos.map((r) => {
+                    const proj = repoProjects[r.toLowerCase()]?.project;
+                    const crossProject = proj && proj !== config.project;
+                    return (
+                      <span className="tag" key={r} title={proj ? `${r} · ${proj}` : r}>
+                        {r}
+                        {crossProject && <span style={{ opacity: 0.65, marginLeft: 4 }}>· {proj}</span>}
+                        <button type="button" onClick={() => setRepos(repos.filter((x) => x !== r))} title="Remove"><X size={12} /></button>
+                      </span>
+                    );
+                  })}
+                  {repos.length === 0 && <span className="muted" style={{ fontSize: 12, padding: '4px 2px' }}>No repositories yet — paste a repo URL above.</span>}
+                </div>
+              </div>
+
+              <div className="card card-pad">
+                <h3 className="settings-section-head">Preferences</h3>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 12 }}>Defaults that shape your lists, overviews and staleness signals.</div>
+                <div className="kv"><span className="k">Default time window</span>
+                  <span className="v">
+                    <select value={months} onChange={(e) => setMonths(e.target.value)} style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 6 }}>
+                      {[1, 3, 6, 12, 24].map((m) => <option key={m} value={m}>{m === 12 ? '1 year' : m === 24 ? '2 years' : `${m} months`}</option>)}
+                    </select>
+                  </span>
+                </div>
+                <div className="kv"><span className="k">Staleness SLA</span>
+                  <span className="v">
+                    <select value={slaDays} onChange={(e) => setSlaDays(e.target.value)} style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 6 }}>
+                      {[...new Set([Number(slaDays) || 7, 1, 2, 3, 5, 7, 14, 21, 30, 60, 90])].sort((a, b) => a - b).map((d) => (
+                        <option key={d} value={d}>{d} day{d === 1 ? '' : 's'}</option>
+                      ))}
+                    </select>
+                  </span>
+                </div>
+                <div className="kv"><span className="k">Table density</span>
+                  <span className="v">
+                    <select value={density} onChange={(e) => setDensity(e.target.value)} style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 6 }}>
+                      <option value="comfortable">Comfortable</option>
+                      <option value="compact">Compact</option>
+                    </select>
+                  </span>
+                </div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+                  Idle PRs/work items past the SLA are flagged as breaching in Analytics, the Action Center and dashboard.
+                </div>
+              </div>
+            </>
+          )}
+
+          {section === 'team' && (
+            <>
+              <div className="card card-pad" style={{ marginBottom: 16 }}>
+                <h3 className="settings-section-head">Team members ({team.length})</h3>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Their open PRs appear under “Authored By Team”, and their work items under the Work Items → Team tab. Search by alias or email, then pick.</div>
+                <MemberSearch items={team} onChange={setTeam} placeholder="Search by alias or email…" />
+              </div>
+
+              <div className="card card-pad">
+                <h3 className="settings-section-head">Review-group aliases for “Assigned to Me”</h3>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                  PRs where any of these groups is a reviewer also appear under Assigned to Me.
+                </div>
+                {groups.map((g) => (
+                  <div className="group-row" key={g.name}>
+                    <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.label || g.name}</span>
+                    <span title={g.name} style={{ fontSize: 12.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</span>
+                    <button className="btn sm" onClick={() => setGroups(groups.filter((x) => x.name !== g.name))}>Remove</button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <input
+                    value={aliasDraft}
+                    onChange={(e) => setAliasDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') addAlias(); }}
+                    placeholder="group-alias@microsoft.com"
+                    style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6 }}
+                  />
+                  <button className="btn accent" onClick={addAlias} disabled={resolving || !aliasDraft.trim()}>
+                    {resolving ? 'Resolving…' : '+ Add'}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {section === 'pipelines' && (
+            <div className="card card-pad">
+              <h3 className="settings-section-head">Pipelines to monitor ({pipelines.length})</h3>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                Paste an ADO pipeline <strong>URL</strong> (<code>…/_build?definitionId=NNN</code>) from a
+                monitored project. The name is filled in automatically.
+              </div>
+              {pipelines.map((p, i) => (
+                <div className="group-row" key={`${p.definitionId}`}>
+                  <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.name || plNames[p.definitionId] || `Pipeline ${p.definitionId}`}
+                  </span>
+                  <span title={p.repo} style={{ fontSize: 12, color: 'var(--text-muted)' }}>#{p.definitionId} · {p.repo || '—'}</span>
+                  <button className="btn sm" onClick={() => setPipelines(pipelines.filter((_, j) => j !== i))}>Remove</button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <input
+                  value={plRef}
+                  onChange={(e) => setPlRef(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') addPipeline(); }}
+                  placeholder="Pipeline URL (…/_build?definitionId=NNN)"
+                  style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6 }}
+                />
+                <button className="btn accent" onClick={addPipeline} disabled={plResolving || !plRef.trim()}>
+                  {plResolving ? 'Resolving…' : '+ Add'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {section === 'workitems' && (
+            <div className="card card-pad" data-tour="settings-workitems">
+              <div className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
+                Work items are tracked across <strong>all your monitored projects</strong> (configure those
+                under <strong>General → Projects</strong>). No area paths needed — every work item in those
+                projects is available under the Work Items tabs.
+              </div>
+
+              <h3 className="settings-section-head">Saved queries ({wiQueries.length})</h3>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                Run your Azure DevOps queries under the Work Items → <strong>Queries</strong> tab. Paste a
+                query <strong>URL</strong> (<code>…/_queries/query/&lt;guid&gt;</code>) — the name, project and
+                organization are filled in automatically.
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <input
+                  value={wiQueryLink}
+                  onChange={(e) => setWiQueryLink(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addQueryByLink(); } }}
+                  placeholder="Query URL (…/_queries/query/<guid>)"
+                  style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13 }}
+                />
+                <button className="btn accent" onClick={addQueryByLink} disabled={wiQueryResolving || !wiQueryLink.trim()}>
+                  {wiQueryResolving ? 'Resolving…' : '+ Add'}
+                </button>
+              </div>
+              {wiQueries.map((q, i) => (
+                <div className="group-row" key={q.id || i}>
+                  <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.name || q.id}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{q.project || '—'}{q.org ? ` · ${orgLabel(q.org)}` : ''}</span>
+                  <button className="btn sm" onClick={() => setWiQueries(wiQueries.filter((_, j) => j !== i))}>Remove</button>
+                </div>
+              ))}
+              {wiQueries.length === 0 && <span className="muted" style={{ fontSize: 12 }}>No saved queries yet — paste a query URL above.</span>}
+            </div>
+          )}
+
+          {section === 'notifications' && (
+            <div className="card card-pad">
+              <h3 className="settings-section-head">Notification preferences</h3>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                In-app notifications poll automatically and show in the bell. Enable desktop / browser
+                notifications to be alerted even when the tab is in the background.
+              </div>
+              {Object.entries(PREF_LABELS).map(([key, label]) => (
+                <div className="check-row" key={key}>
+                  <input type="checkbox" id={key} checked={!!prefs[key]} onChange={() => setPrefs({ ...prefs, [key]: !prefs[key] })} />
+                  <label htmlFor={key} style={{ margin: 0 }}>{label}</label>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {section === 'templates' && (
+            <div className="card card-pad">
+              <h3 className="settings-section-head">Comment templates ({templates.length})</h3>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                Saved reply snippets you can insert into any PR comment or inline review comment.
+              </div>
+              {templates.map((t, i) => (
+                <div key={t.id || i} className="tmpl-edit" style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border-muted)' }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                    <input
+                      value={t.name}
+                      onChange={(e) => { const n = [...templates]; n[i] = { ...t, name: e.target.value }; setTemplates(n); }}
+                      placeholder="Template name"
+                      style={{ flex: 1, padding: '6px 9px', border: '1px solid var(--border)', borderRadius: 6 }}
+                    />
+                    <button className="btn sm" onClick={() => setTemplates(templates.filter((_, j) => j !== i))}>Remove</button>
+                  </div>
+                  <textarea
+                    value={t.body}
+                    onChange={(e) => { const n = [...templates]; n[i] = { ...t, body: e.target.value }; setTemplates(n); }}
+                    placeholder="Template body (Markdown supported)"
+                    rows={2}
+                    style={{ width: '100%', padding: '6px 9px', border: '1px solid var(--border)', borderRadius: 6, resize: 'vertical', fontSize: 13 }}
+                  />
+                </div>
+              ))}
+              <button className="btn sm accent" onClick={() => setTemplates([...templates, { id: `t${Date.now()}`, name: '', body: '' }])}>+ Add template</button>
+            </div>
+          )}
+
+          {section === 'account' && (
+            <div className="card card-pad">
+              <h3 className="settings-section-head">Account</h3>
+              <div className="kv"><span className="k">Signed in as</span><span className="v">{config.me.displayName}</span></div>
+              <div className="kv"><span className="k">Email</span><span className="v">{config.me.uniqueName}</span></div>
+              <div className="kv"><span className="k">Organization</span><span className="v">{config.organizationUrl.replace('https://', '')}</span></div>
+              <div className="kv"><span className="k">Default project</span><span className="v">{config.project}</span></div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>
+                You act with your own Azure DevOps permissions. Settings on this page are personal to you.
+              </div>
+            </div>
+          )}
+        </div>
     </div>
   );
 }

@@ -65,8 +65,8 @@ export function Overview() {
   const config = useConfig();
   const [months, setMonths] = useState(config.defaultTimeRangeMonths || 6);
   // One page: operational category counts (overview) + my personal analytics.
-  const overview = useAsync(() => api.overview(months), [months], { pollMs: 60000 });
-  const analytics = useAsync(() => api.prAnalytics(months), [months]);
+  const overview = useAsync(() => api.overview(months), [months], { pollMs: 60000, cacheKey: `pr:overview:${months}` });
+  const analytics = useAsync(() => api.prAnalytics(months), [months], { cacheKey: `pr:analytics:${months}` });
 
   if (overview.loading && !overview.data) return <Loading label="Loading pull requests…" />;
   if (overview.error) return <ErrorBox error={overview.error} onRetry={overview.refetch} />;

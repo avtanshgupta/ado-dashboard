@@ -4,7 +4,7 @@ import { useConfig } from '../lib/AppContext.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { api } from '../lib/api.js';
 import { Loading, ErrorBox, Empty, RunStatusBadge, TimeAgo } from '../components/ui.jsx';
-import { repoShort, fmtDate, fmtDuration } from '../lib/format.js';
+import { fmtDate, fmtDuration } from '../lib/format.js';
 import { History, RefreshCw, Download, ExternalLink, ArrowUp, ArrowDown, GitBranch, Inbox } from '../components/icons.jsx';
 
 const TIME_RANGES = [
@@ -41,7 +41,7 @@ function Th({ label, k, sort, setSort, align }) {
 export function PipelineRuns() {
   const config = useConfig();
   const [params, setParams] = useSearchParams();
-  const defs = useAsync(() => api.pipelineDefs(false), []);
+  const defs = useAsync(() => api.pipelineDefs(false), [], { cacheKey: 'pl:defs:short' });
 
   const defParam = params.get('def') || '';
   const [months, setMonths] = useState(config.defaultTimeRangeMonths || 6);
@@ -56,7 +56,7 @@ export function PipelineRuns() {
   const runs = useAsync(
     () => (definitionId ? api.pipelineRuns(definitionId, { months }) : Promise.resolve([])),
     [definitionId, months],
-    { pollMs: 30000 }
+    { pollMs: 30000, cacheKey: definitionId ? `pl:runs:${definitionId}:${months}` : undefined }
   );
 
   const shown = useMemo(() => {
@@ -76,8 +76,6 @@ export function PipelineRuns() {
     };
     return [...list].sort((a, b) => { const va = val(a), vb = val(b); return va < vb ? -1 * dir : va > vb ? 1 * dir : 0; });
   }, [runs.data, statusFilter, search, sort]);
-
-  const selected = (defs.data || []).find((d) => String(d.definitionId) === String(definitionId));
 
   return (
     <div>

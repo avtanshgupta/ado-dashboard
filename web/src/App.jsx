@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AppContext } from './lib/AppContext.jsx';
 import { api } from './lib/api.js';
+import { cacheClear } from './lib/dataCache.js';
 import { ToastProvider, Loading, ErrorBox } from './components/ui.jsx';
 import { Layout } from './components/Layout.jsx';
 import { Login } from './pages/Login.jsx';
@@ -17,6 +18,12 @@ import { PipelineRunDetail } from './pages/PipelineRunDetail.jsx';
 import { PrListPage } from './pages/PrListPage.jsx';
 import { PrDetail } from './pages/PrDetail.jsx';
 import { CreatePr } from './pages/CreatePr.jsx';
+import { WorkItems } from './pages/WorkItems.jsx';
+import { WorkItemsOverview } from './pages/WorkItemsOverview.jsx';
+import { WorkItemListPage } from './pages/WorkItemListPage.jsx';
+import { WorkItemQueries } from './pages/WorkItemQueries.jsx';
+import { WorkItemDetail } from './pages/WorkItemDetail.jsx';
+import { CreateWorkItem } from './pages/CreateWorkItem.jsx';
 import { SearchPage } from './pages/SearchPage.jsx';
 import { Settings } from './pages/Settings.jsx';
 
@@ -61,6 +68,7 @@ export default function App() {
     } catch {
       /* ignore */
     }
+    cacheClear();
     setConfig(null);
     setUser(null);
     setExpired(false);
@@ -168,8 +176,19 @@ export default function App() {
                 <Route path="trigger" element={<PipelineTrigger />} />
                 <Route path="runs" element={<PipelineRuns />} />
               </Route>
+              <Route path="work-items" element={<WorkItems />}>
+                <Route index element={<WorkItemsOverview />} />
+                <Route path="assigned" element={<WorkItemListPage variant="assigned" />} />
+                <Route path="created" element={<WorkItemListPage variant="created" />} />
+                <Route path="team" element={<WorkItemListPage variant="team" />} />
+                <Route path="following" element={<WorkItemListPage variant="following" />} />
+                <Route path="sprint" element={<WorkItemListPage variant="sprint" />} />
+                <Route path="queries" element={<WorkItemQueries />} />
+                <Route path="new" element={<CreateWorkItem />} />
+              </Route>
               <Route path="pipelines/run/:buildId" element={<PipelineRunDetail />} />
               <Route path="pr/:repo/:id" element={<PrDetail />} />
+              <Route path="work-item/:id" element={<WorkItemDetail />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<ProjectOverview />} />
             </Route>

@@ -37,7 +37,7 @@ function pushDesktop(newItems) {
   const first = newItems[0];
   const body = newItems.length === 1 ? first.message : `${first.message} (+${newItems.length - 1} more)`;
   try {
-    const n = new Notification('ADO PR Dashboard', { body, tag: 'ado-pr-dashboard' });
+    const n = new Notification('ADO Dashboard', { body, tag: 'ado-dashboard' });
     n.onclick = () => { window.focus(); if (first.webUrl) window.open(first.webUrl, '_blank', 'noopener'); };
   } catch { /* some browsers throw outside a user gesture — ignore */ }
 }

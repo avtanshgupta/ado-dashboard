@@ -418,6 +418,18 @@ table.pr-table tbody tr:hover { background: var(--surface-2); }
   border-radius: 50%; animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }
+.refreshing-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 500; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 999px; padding: 2px 9px; white-space: nowrap;
+}
+
+/* ---- Settings ---- */
+/* Settings uses the shared horizontal .subtabs (as buttons); reset button chrome. */
+button.subtab { background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-family: inherit; }
+.settings-section-head { margin: 0 0 4px; }
 .bar-loading { height: 3px; background: linear-gradient(90deg, var(--accent), #8250df, var(--accent)); background-size: 200% 100%; animation: slide 1.2s linear infinite; }
 @keyframes slide { to { background-position: -200% 0; } }
 

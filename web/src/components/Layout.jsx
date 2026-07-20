@@ -9,7 +9,7 @@ import { BrandMark } from './BrandMark.jsx';
 import { getThemePref, setThemePref } from '../lib/theme.js';
 import {
   LayoutDashboard, GitPullRequest, Workflow, Settings,
-  Search, Menu, Sun, Moon, Monitor, LogOut, Zap, ChevronsLeft, ChevronsRight, Compass,
+  Search, Menu, Sun, Moon, Monitor, LogOut, Zap, ChevronsLeft, ChevronsRight, Compass, ClipboardList,
 } from './icons.jsx';
 
 const THEME_CYCLE = { system: 'light', light: 'dark', dark: 'system' };
@@ -20,6 +20,7 @@ const NAV = [
   { to: '/', Icon: LayoutDashboard, label: 'Dashboard', end: true, tour: 'dashboard' },
   { to: '/action-center', Icon: Zap, label: 'Action Center', tour: 'action-center' },
   { to: '/pull-requests', Icon: GitPullRequest, label: 'Pull Requests', tour: 'pull-requests' },
+  { to: '/work-items', Icon: ClipboardList, label: 'Work Items', tour: 'work-items' },
   { to: '/pipelines', Icon: Workflow, label: 'Pipelines', tour: 'pipelines' },
   { to: '/settings', Icon: Settings, label: 'Settings', tour: 'settings' },
 ];

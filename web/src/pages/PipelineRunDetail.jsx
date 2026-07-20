@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAsync } from '../lib/useAsync.js';
 import { api } from '../lib/api.js';
 import { Loading, ErrorBox, RunStatusBadge, TimeAgo, useToast } from '../components/ui.jsx';
-import { repoShort, fmtDate, fmtDuration } from '../lib/format.js';
+import { repoShort, fmtDuration } from '../lib/format.js';
 import {
   ArrowLeft, RefreshCw, ExternalLink, XCircle, CheckCircle2, Ban, TriangleAlert,
   CircleDot, CircleDashed, GitBranch, Clock, ChevronRight, ChevronDown,
@@ -42,7 +42,7 @@ export function PipelineRunDetail() {
   const { buildId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const { data, loading, error, refetch } = useAsync(() => api.pipelineRunDetail(buildId), [buildId], { pollMs: 15000 });
+  const { data, loading, error, refetch } = useAsync(() => api.pipelineRunDetail(buildId), [buildId], { pollMs: 15000, cacheKey: `pl:run:${buildId}` });
   const [expanded, setExpanded] = useState(() => new Set());
   const [rerunning, setRerunning] = useState(false);
   const [rerunningFailed, setRerunningFailed] = useState(false);

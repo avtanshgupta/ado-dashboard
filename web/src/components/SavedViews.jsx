@@ -35,12 +35,15 @@ export function SavedViews({ variant, filters, sort, onApply }) {
   async function saveCurrent() {
     const nm = name.trim();
     if (!nm) return;
+    const { search: _omit, ...persistFilters } = filters || {};
     const view = {
       id: `v${Date.now()}`,
       name: nm,
       variant,
-      // Persist the sticky filter facets (not the ephemeral free-text search).
-      filters: { repos: filters.repos, states: filters.states, timeRange: filters.timeRange, labels: filters.labels, pipeline: filters.pipeline, review: filters.review },
+      // Persist every sticky filter facet (not the ephemeral free-text search),
+      // so both PR facets (repos/states/labels/…) and work-item facets
+      // (types/categories/assignees/…) round-trip.
+      filters: persistFilters,
       sort,
     };
     try {

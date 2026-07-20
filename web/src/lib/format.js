@@ -79,6 +79,13 @@ export function repoShort(repo) {
   return REPO_SHORT[repo] || repo;
 }
 
+/** Tail segment of an ADO tree path (Project\Area\Sub → Sub). */
+export function shortPath(path) {
+  if (!path) return '';
+  const parts = String(path).split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] || String(path);
+}
+
 export const RUN_STATUS_COLORS = {
   Succeeded: '#1f883d',
   Running: '#0969da',

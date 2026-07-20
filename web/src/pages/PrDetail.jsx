@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useConfig } from '../lib/AppContext.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { api } from '../lib/api.js';
-import { Loading, ErrorBox, StateBadge, ReviewBadge, PipelineBadge, PopBadge, PartialBadge, Avatar, Markdown, Modal, TimeAgo, useToast } from '../components/ui.jsx';
+import { Loading, ErrorBox, StateBadge, ReviewBadge, PipelineBadge, PopBadge, PartialBadge, Avatar, Markdown, Modal, TimeAgo, useToast, RefreshingTag } from '../components/ui.jsx';
 import { MergeModal, RequeueModal } from '../components/actions.jsx';
 import { ReviewerManager } from '../components/ReviewerManager.jsx';
 import { WorkItemManager } from '../components/WorkItemManager.jsx';
@@ -147,7 +147,7 @@ export function PrDetail() {
   const navigate = useNavigate();
   const config = useConfig();
   const toast = useToast();
-  const { data: pr, loading, error, refetch } = useAsync(() => api.detail(repo, id), [repo, id]);
+  const { data: pr, loading, error, refetch, revalidating } = useAsync(() => api.detail(repo, id), [repo, id], { cacheKey: `pr:detail:${repo}:${id}` });
   const [merge, setMerge] = useState(false);
   const [requeue, setRequeue] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -304,7 +304,7 @@ export function PrDetail() {
 
       <div className="detail-header">
         <div style={{ flex: 1 }}>
-          <h1>{pr.title} <span style={{ color: 'var(--text-subtle)', fontWeight: 400 }}>!{pr.id}</span></h1>
+          <h1>{pr.title} <span style={{ color: 'var(--text-subtle)', fontWeight: 400 }}>!{pr.id}</span> <RefreshingTag show={revalidating} /></h1>
           <div className="detail-sub">
             <StateBadge state={pr.state} />
             <span className="badge repo">{repoShort(pr.repo)}</span>

@@ -5,7 +5,7 @@ import { timeAgo, fmtDate, daysSinceDate } from '../lib/format.js';
 import {
   CheckCircle2, XCircle, CircleDot, CircleDashed, Hourglass, Ban, Minus,
   MessageSquare, TriangleAlert, Info, Inbox, ShieldCheck, Clock,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LoaderCircle,
 } from './icons.jsx';
 
 marked.setOptions({ gfm: true, breaks: true });
@@ -29,8 +29,19 @@ export function Markdown({ text, className = '' }) {
   const src = (text ?? '').toString().trim();
   if (!src) return null;
   const html = DOMPurify.sanitize(marked.parse(src, { async: false }));
-  // eslint-disable-next-line react/no-danger
   return <div className={`markdown ${className}`} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+/**
+ * Render trusted-source-but-author-supplied HTML (ADO work-item rich-text fields
+ * — Description, Repro Steps, Acceptance Criteria — are stored as HTML, not
+ * Markdown). Sanitized with DOMPurify before insertion; links open isolated.
+ */
+export function SafeHtml({ html, className = '' }) {
+  const src = (html ?? '').toString().trim();
+  if (!src) return null;
+  const clean = DOMPurify.sanitize(src);
+  return <div className={`markdown ${className}`} dangerouslySetInnerHTML={{ __html: clean }} />;
 }
 
 
@@ -186,6 +197,16 @@ export function Loading({ label = 'Loading…' }) {
       <div className="spinner" />
       <div>{label}</div>
     </div>
+  );
+}
+
+/** A lightweight "fetching fresh data" pill for stale-while-revalidate refreshes. */
+export function RefreshingTag({ show, label = 'Updating…' }) {
+  if (!show) return null;
+  return (
+    <span className="refreshing-tag" title="Showing cached data — fetching the latest…" aria-live="polite">
+      <LoaderCircle size={12} className="spin" aria-hidden="true" /> {label}
+    </span>
   );
 }
 

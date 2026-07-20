@@ -84,7 +84,7 @@ function AnalyticsSection({ defs, months }) {
   const analytics = useAsync(
     () => (definitionId ? api.pipelineAnalytics(definitionId, months) : Promise.resolve(null)),
     [definitionId, months],
-    { pollMs: 60000 }
+    { pollMs: 60000, cacheKey: definitionId ? `pl:analytics:${definitionId}:${months}` : undefined }
   );
   const a = analytics.data;
   const selected = defs.find((d) => String(d.definitionId) === String(definitionId));
@@ -173,8 +173,8 @@ function AnalyticsSection({ defs, months }) {
 export function PipelinesOverview() {
   const config = useConfig();
   const [months, setMonths] = useState(config.defaultTimeRangeMonths || 6);
-  const overview = useAsync(() => api.pipelineOverview(months), [months], { pollMs: 30000 });
-  const defs = useAsync(() => api.pipelineDefs(true), [], { pollMs: 60000 });
+  const overview = useAsync(() => api.pipelineOverview(months), [months], { pollMs: 30000, cacheKey: `pl:overview:${months}` });
+  const defs = useAsync(() => api.pipelineDefs(true), [], { pollMs: 60000, cacheKey: 'pl:defs' });
 
   return (
     <div>

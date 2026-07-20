@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import {
   Zap, LayoutDashboard, GitPullRequestArrow, Eye, UserCheck, Users,
-  Workflow, Settings, Search, Sun, LogOut, RefreshCw,
+  Workflow, Settings, Search, Sun, LogOut, RefreshCw, ClipboardList, CalendarClock,
 } from './icons.jsx';
 
 /**
@@ -27,6 +27,11 @@ export function CommandPalette({ onLogout, onCycleTheme }) {
       { id: 'assigned', label: 'Assigned to Me', hint: 'PRs to review', Icon: Eye, run: () => navigate('/pull-requests/assigned') },
       { id: 'assignedTeam', label: 'Assigned to Team', hint: 'group review', Icon: UserCheck, run: () => navigate('/pull-requests/assigned-team') },
       { id: 'team', label: 'Team Pull Requests', hint: 'authored by team', Icon: Users, run: () => navigate('/pull-requests/team') },
+      { id: 'workitems', label: 'Go to Work Items', hint: 'overview & rollup', Icon: ClipboardList, run: () => navigate('/work-items') },
+      { id: 'wi-assigned', label: 'Work Items Assigned to Me', hint: 'my work items', Icon: Eye, run: () => navigate('/work-items/assigned') },
+      { id: 'wi-created', label: 'Work Items I Created', hint: 'items I opened', Icon: ClipboardList, run: () => navigate('/work-items/created') },
+      { id: 'wi-sprint', label: 'Current Sprint', hint: 'active iteration', Icon: CalendarClock, run: () => navigate('/work-items/sprint') },
+      { id: 'wi-new', label: 'New Work Item', hint: 'create a work item', Icon: ClipboardList, run: () => navigate('/work-items/new') },
       { id: 'pipelines', label: 'Go to Pipelines', hint: 'runs & analytics', Icon: Workflow, run: () => navigate('/pipelines') },
       { id: 'settings', label: 'Go to Settings', hint: 'repos, team, prefs', Icon: Settings, run: () => navigate('/settings') },
       { id: 'refresh', label: 'Refresh current data', hint: 'clear cache & reload', Icon: RefreshCw, run: async () => { try { await api.refresh(); } catch { /* ignore */ } window.location.reload(); } },
@@ -42,13 +47,19 @@ export function CommandPalette({ onLogout, onCycleTheme }) {
     const matched = baseCommands.filter(
       (c) => c.label.toLowerCase().includes(term) || (c.hint || '').toLowerCase().includes(term)
     );
+    const extras = [];
+    // A bare number → jump straight to that work item.
+    const num = q.trim().replace(/^#/, '');
+    if (/^\d+$/.test(num)) {
+      extras.push({ id: 'wi-goto', label: `Open work item #${num}`, Icon: ClipboardList, run: () => navigate(`/work-item/${num}`) });
+    }
     const searchCmd = {
       id: 'search',
       label: `Search PRs & pipelines for “${q.trim()}”`,
       Icon: Search,
       run: () => navigate(`/pull-requests/search?q=${encodeURIComponent(q.trim())}`),
     };
-    return [searchCmd, ...matched];
+    return [...extras, searchCmd, ...matched];
   }, [q, baseCommands, navigate]);
 
   useEffect(() => {
