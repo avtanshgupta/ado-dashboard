@@ -33,6 +33,28 @@ export function orgFromUrl(orgUrl) {
 }
 
 /**
+ * Extract the organization BASE URL from any Azure DevOps URL:
+ *   https://dev.azure.com/{org}/{project}/...   → https://dev.azure.com/{org}
+ *   https://{org}.visualstudio.com/{project}/... → https://{org}.visualstudio.com
+ * Returns null if the host isn't a recognized ADO host.
+ */
+export function orgBaseFromUrl(input) {
+  let u;
+  try {
+    u = new URL(String(input || '').trim());
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase();
+  if (host === 'dev.azure.com' || host === 'vssps.dev.azure.com') {
+    const org = u.pathname.split('/').filter(Boolean)[0];
+    return org ? `https://dev.azure.com/${dec(org)}` : null;
+  }
+  if (/\.visualstudio\.com$/.test(host)) return `https://${host}`;
+  return null;
+}
+
+/**
  * Parse an Azure DevOps repository URL into { org, project, repo }.
  * Returns null if the input is not a recognizable ADO repo link.
  *

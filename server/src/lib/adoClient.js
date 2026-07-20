@@ -62,7 +62,10 @@ export function clearCache() {
   for (const k of cache.keys()) if (k.startsWith(prefix)) cache.delete(k);
 }
 
-// ---- URL helpers ----
+// ---- URL helpers (multi-org aware) ----
+// The DEFAULT org base (used for identity/access checks and as a fallback). Each
+// project carries its own org base (currentConfig().projectOrgMap), so data can
+// be fetched from whichever organization owns the project.
 const ORG = config.organizationUrl.replace(/\/$/, '');
 
 // The default project (org-level fallback). Repos and pipelines carry their own
@@ -74,17 +77,26 @@ function enc(project) {
   return encodeURIComponent(project || defaultProject());
 }
 
+/** Org base URL that owns a project (multi-org). Falls back to the default org. */
+export function orgBaseForProject(project) {
+  const cfg = currentConfig();
+  return cfg?.projectOrgMap?.get(String(project || '').toLowerCase()) || ORG;
+}
+
 /**
- * Resolve the { project, projectId } that owns a repository. Repos are tracked
- * with their project (see userConfig.repoProjects); anything unknown falls back
- * to the org default project.
+ * Resolve the { project, projectId, org } that owns a repository. Repos are
+ * tracked with their project + org (see userConfig.repoProjects); anything
+ * unknown falls back to the org default project / default org.
  */
 export function projectForRepo(repo) {
   const cfg = currentConfig();
   const hit = cfg?.repoProjectMap?.get(String(repo || '').toLowerCase());
+  const project = hit?.project || cfg?.project || config.project;
+  const org = hit?.org || cfg?.projectOrgMap?.get(String(project).toLowerCase()) || ORG;
   return {
-    project: hit?.project || cfg?.project || config.project,
+    project,
     projectId: hit?.projectId || cfg?.projectId || config.projectId,
+    org,
   };
 }
 
@@ -95,29 +107,35 @@ export function projectForDefinition(definitionId) {
 }
 
 export function gitUrl(repo, subpath = '') {
+  const { project, org } = projectForRepo(repo);
   const tail = subpath ? `/${subpath}` : '';
-  return `${ORG}/${enc(projectForRepo(repo).project)}/_apis/git/repositories/${encodeURIComponent(repo)}${tail}`;
+  return `${org}/${enc(project)}/_apis/git/repositories/${encodeURIComponent(repo)}${tail}`;
 }
 export function policyUrl(subpath, project) {
-  return `${ORG}/${enc(project)}/_apis/policy/${subpath}`;
+  return `${orgBaseForProject(project)}/${enc(project)}/_apis/policy/${subpath}`;
 }
 export function buildApiUrl(subpath, project) {
-  return `${ORG}/${enc(project)}/_apis/build/${subpath}`;
+  return `${orgBaseForProject(project)}/${enc(project)}/_apis/build/${subpath}`;
 }
-/** Work Item Tracking API URL (project-scoped). */
+/** Work Item Tracking API URL (project-scoped, org-aware). */
 export function witUrl(subpath, project) {
-  return `${ORG}/${enc(project)}/_apis/wit/${subpath}`;
+  return `${orgBaseForProject(project)}/${enc(project)}/_apis/wit/${subpath}`;
 }
 /** Web URL for a build/pipeline run. */
 export function buildWebUrl(buildId, project) {
-  return `${ORG}/${enc(project)}/_build/results?buildId=${buildId}&view=results`;
+  return `${orgBaseForProject(project)}/${enc(project)}/_build/results?buildId=${buildId}&view=results`;
 }
 /** Web URL for a pipeline definition. */
 export function definitionWebUrl(definitionId, project) {
-  return `${ORG}/${enc(project)}/_build?definitionId=${definitionId}`;
+  return `${orgBaseForProject(project)}/${enc(project)}/_build?definitionId=${definitionId}`;
 }
+/** Org-level URL on the DEFAULT org (identity, access, default-org projects). */
 export function orgUrl(subpath) {
   return `${ORG}/${subpath}`;
+}
+/** Org-level URL on a specific org base (multi-org work-item hydration, etc.). */
+export function orgApiUrl(orgBase, subpath) {
+  return `${(orgBase || ORG).replace(/\/$/, '')}/${subpath}`;
 }
 
 function buildUrl(url, query) {
@@ -260,6 +278,28 @@ export async function adoSend(method, url, body, { query, contentType } = {}) {
   return limit(async () => {
     const value = await rawFetch(method, url, { query, body, contentType });
     clearCache();
+    return value;
+  });
+}
+
+/**
+ * Read-only POST (e.g. WIQL, work-item batch) with per-user caching. Unlike
+ * adoSend it does NOT clear the cache — the endpoint only reads — so polling
+ * these queries won't churn other cached GETs. Cache key includes the body.
+ */
+export async function adoQuery(url, body, { query, cache: useCache = true } = {}) {
+  const key = userKey(`POST ${buildUrl(url, query)} ${JSON.stringify(body || {})}`);
+  if (useCache) {
+    const hit = cacheGet(key);
+    if (hit !== undefined) return hit;
+  }
+  return limit(async () => {
+    if (useCache) {
+      const hit = cacheGet(key);
+      if (hit !== undefined) return hit;
+    }
+    const value = await rawFetch('POST', url, { query, body });
+    if (useCache) cacheSet(key, value);
     return value;
   });
 }

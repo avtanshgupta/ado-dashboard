@@ -150,7 +150,7 @@ export function classifyThread(thread) {
 }
 
 /** Summarize threads into comment counts + participants. */
-export function summarizeThreads(threads, meId) {
+export function summarizeThreads(threads, _meId) {
   const classified = (threads || [])
     .map(classifyThread)
     .filter((t) => !t.isSystem);

@@ -27,6 +27,19 @@ loadDotEnv();
 
 const appConfig = JSON.parse(readFileSync(join(serverRoot, 'config', 'app.config.json'), 'utf8'));
 
+const ORG_URL = appConfig.organizationUrl.replace(/\/$/, '');
+/** Canonical web URL for a project in the default org (seed/display). */
+export function projectUrl(name) {
+  return `${ORG_URL}/${encodeURIComponent(name)}`;
+}
+
+// The org-configured monitored projects (seed defaults for each user). Each
+// carries its org base URL so data can be fetched from the right organization.
+const seedProjects =
+  Array.isArray(appConfig.projects) && appConfig.projects.length
+    ? appConfig.projects.map((p) => ({ name: p.name, id: p.id || '', url: projectUrl(p.name), org: ORG_URL }))
+    : [{ name: appConfig.project, id: appConfig.projectId, url: projectUrl(appConfig.project), org: ORG_URL }];
+
 // Defaults used to seed the user's personal config on first run.
 export const defaults = {
   repositories: appConfig.repositories,
@@ -34,6 +47,7 @@ export const defaults = {
   reviewerGroups: appConfig.reviewerGroups || [],
   defaultTimeRangeMonths: appConfig.defaultTimeRangeMonths || 6,
   pipelines: appConfig.pipelines || [],
+  projects: seedProjects,
 };
 
 export const config = {
@@ -41,12 +55,9 @@ export const config = {
   organizationUrl: appConfig.organizationUrl,
   project: appConfig.project,
   projectId: appConfig.projectId,
-  // Optional multi-project support (F2). Defaults to the single configured
-  // project so behaviour is unchanged unless `projects` is set in app.config.
-  projects:
-    Array.isArray(appConfig.projects) && appConfig.projects.length
-      ? appConfig.projects.map((p) => ({ name: p.name, id: p.id || '' }))
-      : [{ name: appConfig.project, id: appConfig.projectId }],
+  // The org-level monitored projects; each user gets their own editable copy
+  // seeded from here (see userConfig). Data is scoped to these projects.
+  projects: seedProjects.map((p) => ({ name: p.name, id: p.id })),
   adoResourceId: appConfig.adoResourceId,
   defaults,
   // ---- infra ----
@@ -69,15 +80,6 @@ export const config = {
   // On Azure there is no `az` CLI; set DISABLE_AZ_FALLBACK=true so the server
   // never attempts the local fallback and goes straight to token-paste login.
   disableAzFallback: String(process.env.DISABLE_AZ_FALLBACK || 'false') === 'true',
-  email: {
-    host: process.env.SMTP_HOST || '',
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: String(process.env.SMTP_SECURE || 'false') === 'true',
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
-    from: process.env.NOTIFY_EMAIL_FROM || process.env.SMTP_USER || '',
-    enabled: Boolean(process.env.SMTP_HOST),
-  },
 };
 
 /** Build the reviewer-group name→label map for a user's config. */

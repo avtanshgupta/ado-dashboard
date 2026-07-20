@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRepoUrl, orgFromUrl } from '../src/lib/repoLink.js';
+import { parseRepoUrl, orgFromUrl, orgBaseFromUrl } from '../src/lib/repoLink.js';
 
 test('parses dev.azure.com repo URL', () => {
   assert.deepEqual(
@@ -64,4 +64,12 @@ test('orgFromUrl extracts the org from both host styles', () => {
   assert.equal(orgFromUrl('https://dev.azure.com/microsoft'), 'microsoft');
   assert.equal(orgFromUrl('https://dev.azure.com/Contoso/'), 'contoso');
   assert.equal(orgFromUrl('garbage'), '');
+});
+
+test('orgBaseFromUrl returns the org base URL for both host styles', () => {
+  assert.equal(orgBaseFromUrl('https://microsoft.visualstudio.com/Windows%20Defender'), 'https://microsoft.visualstudio.com');
+  assert.equal(orgBaseFromUrl('https://dev.azure.com/MSecProductSecurity/AI%20Vuln%20Scanning/_git/repo'), 'https://dev.azure.com/MSecProductSecurity');
+  assert.equal(orgBaseFromUrl('https://dev.azure.com/MSecProductSecurity'), 'https://dev.azure.com/MSecProductSecurity');
+  assert.equal(orgBaseFromUrl('https://example.com/x'), null);
+  assert.equal(orgBaseFromUrl('not a url'), null);
 });

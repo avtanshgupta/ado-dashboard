@@ -1,4 +1,3 @@
-import { config } from '../config.js';
 import { currentConfig, currentUser } from '../lib/context.js';
 import { adoGet, gitUrl, policyUrl, witUrl, projectForRepo } from '../lib/adoClient.js';
 import { buildActionCenter, applyActionOverlay, itemSignature } from '../lib/prPriority.js';
@@ -115,7 +114,7 @@ async function fetchLabels(repo, prId) {
 
 // Linked work items: PR endpoint returns id refs; batch-fetch titles/type/state.
 async function fetchWorkItems(repo, prId) {
-  const { project } = projectForRepo(repo);
+  const { project, org } = projectForRepo(repo);
   const refs = await adoGet(gitUrl(repo, `pullRequests/${prId}/workitems`), { query: { 'api-version': '7.1' } });
   const ids = (refs.value || []).map((r) => r.id).filter(Boolean);
   if (!ids.length) return [];
@@ -127,7 +126,7 @@ async function fetchWorkItems(repo, prId) {
     title: w.fields?.['System.Title'] || `Work item ${w.id}`,
     type: w.fields?.['System.WorkItemType'] || null,
     state: w.fields?.['System.State'] || null,
-    url: `${config.organizationUrl}/${encodeURIComponent(project)}/_workitems/edit/${w.id}`,
+    url: `${org}/${encodeURIComponent(project)}/_workitems/edit/${w.id}`,
   }));
 }
 
@@ -170,7 +169,7 @@ function baseShape(pr) {
     },
     reviewStatus: review.status,
     review,
-    webUrl: prWebUrl(config.organizationUrl, projectForRepo(pr._repo).project, pr._repo, pr.pullRequestId),
+    webUrl: prWebUrl(projectForRepo(pr._repo).org, projectForRepo(pr._repo).project, pr._repo, pr.pullRequestId),
     labels: (pr.labels || []).map((l) => l.name),
   };
 }
@@ -358,7 +357,7 @@ export async function getOverview({ months } = {}) {
       );
       return {
         repo,
-        webUrl: `${config.organizationUrl}/${encodeURIComponent(projectForRepo(repo).project)}/_git/${encodeURIComponent(repo)}`,
+        webUrl: `${projectForRepo(repo).org}/${encodeURIComponent(projectForRepo(repo).project)}/_git/${encodeURIComponent(repo)}`,
         my: bucket(mine),
         assignedMe: bucket(assignedMe),
         assignedTeam: bucket(assignedTeam),
@@ -574,7 +573,7 @@ export async function getPrAnalytics({ months } = {}) {
     createdBy: { id: pr.createdBy?.id, displayName: pr.createdBy?.displayName },
     creationDate: pr.creationDate,
     closedDate: pr.closedDate || null,
-    webUrl: prWebUrl(config.organizationUrl, projectForRepo(pr._repo).project, pr._repo, pr.pullRequestId),
+    webUrl: prWebUrl(projectForRepo(pr._repo).org, projectForRepo(pr._repo).project, pr._repo, pr.pullRequestId),
   });
 
   const [created, assignedMe, closedLists] = await Promise.all([
@@ -619,7 +618,7 @@ export async function getStandup({ sinceHours } = {}) {
     title: pr.title,
     createdBy: { id: pr.createdBy?.id },
     closedDate: pr.closedDate || null,
-    webUrl: prWebUrl(config.organizationUrl, projectForRepo(pr._repo).project, pr._repo, pr.pullRequestId),
+    webUrl: prWebUrl(projectForRepo(pr._repo).org, projectForRepo(pr._repo).project, pr._repo, pr.pullRequestId),
   });
 
   const [created, assignedMe, mergedByRepo] = await Promise.all([

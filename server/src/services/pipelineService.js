@@ -10,11 +10,13 @@ import {
   projectForDefinition,
 } from '../lib/adoClient.js';
 
-// Distinct projects that own the user's tracked pipelines, plus the org default.
-// Used to fan out build queries and to resolve a build's project by id.
+// Distinct projects to probe for builds/definitions: the monitored projects plus
+// any project owning a tracked pipeline, plus the org default. Used to fan out
+// build queries and to resolve a build's/definition's project by id.
 function pipelineProjects() {
   const cfg = currentConfig();
   const set = new Set();
+  for (const p of cfg?.projects || []) if (p.name) set.add(p.name);
   for (const p of cfg?.pipelines || []) if (p.project) set.add(p.project);
   set.add(cfg?.project || config.project);
   return [...set];
@@ -163,11 +165,10 @@ export async function listDefinitions({ withLatest = true } = {}) {
  */
 export async function resolveDefinition(ref) {
   const raw = String(ref || '').trim();
-  let id = null;
-  const m = raw.match(/definitionId=(\d+)/) || raw.match(/^(\d+)$/);
-  if (m) id = Number(m[1]);
+  const m = raw.match(/definitionId=(\d+)/i);
+  const id = m ? Number(m[1]) : null;
   if (!id) {
-    const e = new Error('Enter a numeric pipeline id or an ADO pipeline URL containing definitionId=NNN.');
+    const e = new Error('Paste a pipeline URL containing definitionId=NNN (adding by bare id is no longer supported).');
     e.status = 400;
     throw e;
   }
@@ -183,6 +184,12 @@ export async function resolveDefinition(ref) {
   if (!def || !def.id) {
     const e = new Error(`Pipeline ${id} not found or not accessible.`);
     e.status = 404;
+    throw e;
+  }
+  const cfg = currentConfig();
+  if (cfg?.projectSet?.size && project && !cfg.projectSet.has(String(project).toLowerCase())) {
+    const e = new Error(`Pipeline ${id} is in project “${project}”, which isn't one of your monitored projects. Add the project first.`);
+    e.status = 400;
     throw e;
   }
   return {

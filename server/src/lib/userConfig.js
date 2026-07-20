@@ -2,6 +2,16 @@ import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { config, defaults, groupNameToLabel } from '../config.js';
 import { writeJsonAtomic } from './atomicFile.js';
+import { orgBaseFromUrl } from './repoLink.js';
+
+const DEFAULT_ORG = config.organizationUrl.replace(/\/$/, '');
+/** Org base URL for a project url (fallback: the default org). */
+function orgForUrl(url) {
+  return orgBaseFromUrl(url) || DEFAULT_ORG;
+}
+function projectUrlFor(name) {
+  return `${DEFAULT_ORG}/${encodeURIComponent(name)}`;
+}
 
 const usersDir = join(config.dataDir, 'users');
 
@@ -24,14 +34,10 @@ export const DEFAULT_NOTIF_PREFS = {
   pipelineFailed: false,
   pipelineSucceeded: false,
   prClosed: false,
-  email: false,
   browserPush: false, // C2 — desktop/browser notifications
-  chat: false, // D1 — Slack/Teams webhook fan-out
-  digest: 'off', // C3 — 'off' | 'daily' | 'weekly' summary email
 };
 
-// C3 digest cadence is the one non-boolean notification pref.
-const NOTIF_PREF_ENUMS = { digest: new Set(['off', 'daily', 'weekly']) };
+const NOTIF_PREF_ENUMS = {};
 
 export const DEFAULT_UI_PREFS = {
   density: 'comfortable', // E5 — 'comfortable' | 'compact' table rows
@@ -42,13 +48,14 @@ const UI_PREF_BOOLS = new Set(['onboarded']);
 
 export const DEFAULT_SLA_DAYS = 7; // B4 — idle days before a PR is "breaching SLA"
 
-/** Short opaque id for user-created records (templates, saved views, webhooks). */
+/** Short opaque id for user-created records (templates, saved views). */
 function rid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
 function seed() {
   return {
+    projects: defaults.projects.map((p) => ({ ...p })), // monitored ADO projects (scope for all data)
     repositories: [...defaults.repositories],
     repoProjects: {}, // repoNameLower -> { project, projectId } for cross-project repos
     team: [...defaults.team],
@@ -58,14 +65,34 @@ function seed() {
     notificationPrefs: { ...DEFAULT_NOTIF_PREFS },
     commentTemplates: [], // A4
     savedViews: [], // E1
-    chatWebhooks: [], // D1
     mutedRepos: [], // C4
     uiPrefs: { ...DEFAULT_UI_PREFS }, // E5
     slaDays: DEFAULT_SLA_DAYS, // B4
+    workItemSavedQueries: [], // WI — saved ADO WIQL query ids to run in the Queries tab
   };
 }
 
-/** Normalize a stored repoProjects map: { repoNameLower: { project, projectId } }. */
+/** Normalize a stored projects list: [{ name, id, url, org }]. */
+function normalizeProjects(v) {
+  if (!Array.isArray(v)) return null;
+  const seen = new Set();
+  const out = [];
+  for (const p of v) {
+    const name = typeof p?.name === 'string' ? p.name.trim() : '';
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    const url = typeof p.url === 'string' && p.url.trim() ? p.url.trim() : projectUrlFor(name);
+    out.push({
+      name,
+      id: typeof p.id === 'string' ? p.id.trim() : '',
+      url,
+      org: typeof p.org === 'string' && p.org.trim() ? p.org.trim().replace(/\/$/, '') : orgForUrl(url),
+    });
+  }
+  return out;
+}
+
+/** Normalize a stored repoProjects map: { repoNameLower: { project, projectId, org } }. */
 function normalizeRepoProjects(v) {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
   const out = {};
@@ -74,7 +101,8 @@ function normalizeRepoProjects(v) {
     const project = typeof meta.project === 'string' ? meta.project.trim() : '';
     if (!project) continue;
     const projectId = typeof meta.projectId === 'string' ? meta.projectId.trim() : '';
-    out[String(name).toLowerCase()] = { project, projectId };
+    const org = typeof meta.org === 'string' && meta.org.trim() ? meta.org.trim().replace(/\/$/, '') : '';
+    out[String(name).toLowerCase()] = { project, projectId, ...(org ? { org } : {}) };
   }
   return out;
 }
@@ -93,6 +121,7 @@ export function loadUserConfig(userId) {
   // round-trip, then normalise the known keys (filling any missing from defaults).
   return {
     ...stored,
+    projects: normalizeProjects(stored.projects) || defaults.projects.map((p) => ({ ...p })),
     repositories: stored.repositories || [...defaults.repositories],
     repoProjects: normalizeRepoProjects(stored.repoProjects),
     team: stored.team || [...defaults.team],
@@ -102,16 +131,17 @@ export function loadUserConfig(userId) {
     notificationPrefs: { ...DEFAULT_NOTIF_PREFS, ...(stored.notificationPrefs || {}) },
     commentTemplates: Array.isArray(stored.commentTemplates) ? stored.commentTemplates : [],
     savedViews: Array.isArray(stored.savedViews) ? stored.savedViews : [],
-    chatWebhooks: Array.isArray(stored.chatWebhooks) ? stored.chatWebhooks : [],
     mutedRepos: Array.isArray(stored.mutedRepos) ? stored.mutedRepos : [],
     uiPrefs: { ...DEFAULT_UI_PREFS, ...(stored.uiPrefs || {}) },
     slaDays: Number.isInteger(stored.slaDays) ? stored.slaDays : DEFAULT_SLA_DAYS,
+    workItemSavedQueries: Array.isArray(stored.workItemSavedQueries) ? stored.workItemSavedQueries : [],
   };
 }
 
 const ALLOWED_KEYS = [
-  'repositories', 'repoProjects', 'team', 'reviewerGroups', 'defaultTimeRangeMonths', 'pipelines', 'notificationPrefs',
-  'commentTemplates', 'savedViews', 'chatWebhooks', 'mutedRepos', 'uiPrefs', 'slaDays',
+  'projects', 'repositories', 'repoProjects', 'team', 'reviewerGroups', 'defaultTimeRangeMonths', 'pipelines', 'notificationPrefs',
+  'commentTemplates', 'savedViews', 'mutedRepos', 'uiPrefs', 'slaDays',
+  'workItemSavedQueries',
 ];
 
 const KNOWN_PREF_KEYS = new Set(Object.keys(DEFAULT_NOTIF_PREFS));
@@ -154,7 +184,8 @@ function validateAndNormalize(partial) {
       const project = typeof meta.project === 'string' ? meta.project.trim() : '';
       if (!project) throw badRequest(`repoProjects["${name}"].project is required.`);
       const projectId = typeof meta.projectId === 'string' ? meta.projectId.trim() : '';
-      out[String(name).toLowerCase()] = { project, projectId };
+      const org = typeof meta.org === 'string' && meta.org.trim() ? meta.org.trim().replace(/\/$/, '') : '';
+      out[String(name).toLowerCase()] = { project, projectId, ...(org ? { org } : {}) };
     }
     clean.repoProjects = out;
   }
@@ -219,7 +250,6 @@ function validateAndNormalize(partial) {
 
   if (partial.commentTemplates !== undefined) clean.commentTemplates = validateTemplates(partial.commentTemplates);
   if (partial.savedViews !== undefined) clean.savedViews = validateSavedViews(partial.savedViews);
-  if (partial.chatWebhooks !== undefined) clean.chatWebhooks = validateWebhooks(partial.chatWebhooks);
   if (partial.mutedRepos !== undefined) clean.mutedRepos = asStringArray(partial.mutedRepos, 'mutedRepos');
 
   if (partial.uiPrefs !== undefined) {
@@ -240,6 +270,9 @@ function validateAndNormalize(partial) {
     if (!Number.isInteger(n) || n < 1 || n > 90) throw badRequest('slaDays must be an integer between 1 and 90.');
     clean.slaDays = n;
   }
+
+  if (partial.projects !== undefined) clean.projects = validateProjects(partial.projects);
+  if (partial.workItemSavedQueries !== undefined) clean.workItemSavedQueries = validateSavedQueries(partial.workItemSavedQueries);
 
   return clean;
 }
@@ -283,20 +316,40 @@ function validateSavedViews(val) {
   });
 }
 
-/** D1 — outbound chat webhooks: [{ id, type, url, name }]. */
-function validateWebhooks(val) {
-  if (!Array.isArray(val)) throw badRequest('chatWebhooks must be an array.');
-  if (val.length > 20) throw badRequest('Too many chat webhooks (max 20).');
-  return val.map((w, i) => {
-    if (!w || typeof w !== 'object') throw badRequest(`chatWebhooks[${i}] must be an object.`);
-    const type = w.type === 'teams' ? 'teams' : 'slack';
-    const url = requireString(w.url, `chatWebhooks[${i}].url`, { max: 2000 });
-    if (!/^https:\/\//i.test(url)) throw badRequest(`chatWebhooks[${i}].url must be an https URL.`);
-    return {
-      id: typeof w.id === 'string' && w.id.trim() ? w.id.trim() : rid(),
-      type,
+/** Monitored ADO projects: [{ name, id, url, org }]. Data is scoped to these. */
+function validateProjects(val) {
+  if (!Array.isArray(val)) throw badRequest('projects must be an array.');
+  if (val.length > 50) throw badRequest('Too many projects (max 50).');
+  const seen = new Set();
+  const out = [];
+  for (const [i, p] of val.entries()) {
+    if (!p || typeof p !== 'object') throw badRequest(`projects[${i}] must be an object.`);
+    const name = requireString(p.name, `projects[${i}].name`, { max: 200 });
+    if (seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    const url = typeof p.url === 'string' && p.url.trim() ? p.url.trim() : projectUrlFor(name);
+    out.push({
+      name,
+      id: typeof p.id === 'string' ? p.id.trim() : '',
       url,
-      name: typeof w.name === 'string' && w.name.trim() ? w.name.trim().slice(0, 80) : (type === 'teams' ? 'Teams' : 'Slack'),
+      org: typeof p.org === 'string' && p.org.trim() ? p.org.trim().replace(/\/$/, '') : orgForUrl(url),
+    });
+  }
+  return out;
+}
+
+/** WI — saved ADO WIQL queries to run in the Queries tab: [{ id, name, project, org }]. */
+function validateSavedQueries(val) {
+  if (!Array.isArray(val)) throw badRequest('workItemSavedQueries must be an array.');
+  if (val.length > 50) throw badRequest('Too many saved queries (max 50).');
+  return val.map((q, i) => {
+    if (!q || typeof q !== 'object') throw badRequest(`workItemSavedQueries[${i}] must be an object.`);
+    const id = requireString(q.id, `workItemSavedQueries[${i}].id`, { max: 200 });
+    return {
+      id,
+      name: typeof q.name === 'string' && q.name.trim() ? q.name.trim().slice(0, 200) : id,
+      ...(typeof q.project === 'string' && q.project.trim() ? { project: q.project.trim() } : {}),
+      ...(typeof q.org === 'string' && q.org.trim() ? { org: q.org.trim().replace(/\/$/, '') } : {}),
     };
   });
 }
@@ -341,11 +394,24 @@ export function effectiveConfig(user) {
   for (const p of pipelines) {
     if (p.definitionId && p.project) pipelineProjectMap.set(String(p.definitionId), p.project);
   }
+
+  // Monitored projects define the scope for ALL data. Fall back to the org
+  // defaults if a user somehow has none. Only names are needed to run WIQL (the
+  // wiql/workitems APIs are name-scoped); ids help build web URLs.
+  const projects = (uc.projects && uc.projects.length ? uc.projects : defaults.projects).map((p) => ({ ...p }));
+  const projectSet = new Set(projects.map((p) => p.name.toLowerCase()));
+  // project name(lower) -> org base URL, so ADO calls hit the right organization.
+  const projectOrgMap = new Map();
+  for (const p of projects) projectOrgMap.set(p.name.toLowerCase(), p.org || DEFAULT_ORG);
+
   return {
     organizationUrl: config.organizationUrl,
     project: config.project, // org default (fallback for repos with no project)
     projectId: config.projectId,
     me: user,
+    projects,
+    projectSet,
+    projectOrgMap,
     repositories: uc.repositories,
     repoProjects,
     repoProjectMap,
@@ -359,11 +425,13 @@ export function effectiveConfig(user) {
     notificationPrefs: uc.notificationPrefs,
     commentTemplates: uc.commentTemplates || [],
     savedViews: uc.savedViews || [],
-    chatWebhooks: uc.chatWebhooks || [],
     mutedRepos: uc.mutedRepos || [],
     mutedRepoSet: new Set((uc.mutedRepos || []).map((r) => r.toLowerCase())),
     uiPrefs: uc.uiPrefs || { ...DEFAULT_UI_PREFS },
     slaDays: uc.slaDays || DEFAULT_SLA_DAYS,
+    workItemSavedQueries: uc.workItemSavedQueries || [],
+    // WI is scoped to the monitored projects (name + id + org).
+    workItemProjects: projects.map((p) => ({ name: p.name, id: p.id, org: p.org || DEFAULT_ORG })),
     raw: uc,
   };
 }

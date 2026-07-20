@@ -2,6 +2,11 @@
   "organizationUrl": "https://microsoft.visualstudio.com",
   "project": "Windows Defender",
   "projectId": "22c8b9b6-7c86-4516-8af1-f55966ddb094",
+  "projects": [
+    { "name": "Windows Defender", "id": "22c8b9b6-7c86-4516-8af1-f55966ddb094" },
+    { "name": "OS", "id": "8d47e068-03c8-4cdc-aa9b-fc6929290322" },
+    { "name": "WDATP", "id": "f0333b3d-d941-487c-a94f-e67582d4268d" }
+  ],
   "adoResourceId": "499b84ac-1321-427f-aa17-267ca6975798",
   "repositories": [
     "WD.Client.Linux"

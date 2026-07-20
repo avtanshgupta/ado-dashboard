@@ -15,11 +15,10 @@ test('fresh config seeds the new preference keys', () => {
   const c = loadUserConfig(UID);
   assert.deepEqual(c.commentTemplates, []);
   assert.deepEqual(c.savedViews, []);
-  assert.deepEqual(c.chatWebhooks, []);
   assert.deepEqual(c.mutedRepos, []);
   assert.equal(c.uiPrefs.density, 'comfortable');
   assert.equal(c.slaDays, 7);
-  assert.equal(c.notificationPrefs.digest, 'off');
+  assert.equal(c.notificationPrefs.newComment, false);
 });
 
 test('saves and normalizes comment templates (assigns ids)', () => {
@@ -35,20 +34,10 @@ test('rejects a template missing a body', () => {
   assert.throws(() => saveUserConfig(UID, { commentTemplates: [{ name: 'x' }] }), /body (is required|must be a string)/);
 });
 
-test('digest pref accepts enum values and rejects others', () => {
-  const ok = saveUserConfig(UID, { notificationPrefs: { digest: 'weekly' } });
-  assert.equal(ok.notificationPrefs.digest, 'weekly');
-  assert.throws(() => saveUserConfig(UID, { notificationPrefs: { digest: 'hourly' } }), /digest must be one of/);
-});
-
-test('chat webhooks require an https url', () => {
-  assert.throws(
-    () => saveUserConfig(UID, { chatWebhooks: [{ type: 'slack', url: 'http://insecure' }] }),
-    /must be an https url/i
-  );
-  const ok = saveUserConfig(UID, { chatWebhooks: [{ type: 'teams', url: 'https://outlook.office.com/hook/abc' }] });
-  assert.equal(ok.chatWebhooks[0].type, 'teams');
-  assert.match(ok.chatWebhooks[0].id, /^[a-z0-9]+$/);
+test('notification prefs coerce to booleans and ignore unknown keys', () => {
+  const ok = saveUserConfig(UID, { notificationPrefs: { newPr: 'yes', bogus: true } });
+  assert.equal(ok.notificationPrefs.newPr, true);
+  assert.equal('bogus' in ok.notificationPrefs, false);
 });
 
 test('slaDays is clamped to an integer range', () => {
@@ -108,4 +97,50 @@ test('pipelines persist an optional project and projectId', () => {
   });
   assert.equal(ok.pipelines[0].project, 'ProjX');
   assert.equal(ok.pipelines[0].projectId, 'pid-9');
+});
+
+test('projects seed from defaults, validate, dedupe, and default a url', () => {
+  const fresh = loadUserConfig('proj-user');
+  assert.ok(fresh.projects.length >= 1);
+  assert.ok(fresh.projects.every((p) => p.name && p.url && p.org));
+  const ok = saveUserConfig('proj-user', {
+    projects: [
+      { name: 'OS', id: 'os-id' },
+      { name: ' OS ' },
+      { name: 'AI Vuln Scanning', id: 'v-id', url: 'https://dev.azure.com/MSecProductSecurity/AI%20Vuln%20Scanning' },
+    ],
+  });
+  assert.deepEqual(ok.projects.map((p) => p.name), ['OS', 'AI Vuln Scanning']); // deduped
+  assert.match(ok.projects[0].url, /\/OS$/); // url defaulted from name
+  assert.equal(ok.projects[0].org, 'https://microsoft.visualstudio.com'); // default org
+  assert.equal(ok.projects[1].org, 'https://dev.azure.com/MSecProductSecurity'); // org parsed from url
+  assert.throws(() => saveUserConfig('proj-user', { projects: [{ id: 'x' }] }), /name (is required|must be a string)/);
+});
+
+test('work item saved queries validate id and default name to id', () => {
+  const ok = saveUserConfig('wi-user', {
+    workItemSavedQueries: [{ id: 'guid-1', project: 'WD' }, { id: 'guid-2', name: 'My Bugs' }],
+  });
+  assert.equal(ok.workItemSavedQueries[0].id, 'guid-1');
+  assert.equal(ok.workItemSavedQueries[0].name, 'guid-1'); // defaults to id
+  assert.equal(ok.workItemSavedQueries[0].project, 'WD');
+  assert.equal(ok.workItemSavedQueries[1].name, 'My Bugs');
+  assert.throws(() => saveUserConfig('wi-user', { workItemSavedQueries: [{ name: 'no id' }] }), /id (is required|must be a string)/);
+});
+
+test('effectiveConfig scopes workItemProjects to the monitored projects (with org)', async () => {
+  const { effectiveConfig } = await import('../src/lib/userConfig.js');
+  saveUserConfig('wi-scope', {
+    projects: [
+      { name: 'Alpha', id: 'a1' },
+      { name: 'Beta', id: 'b1', url: 'https://dev.azure.com/OtherOrg/Beta' },
+    ],
+  });
+  const eff = effectiveConfig({ id: 'wi-scope', displayName: 'U' });
+  assert.deepEqual(eff.workItemProjects.map((p) => p.name).sort(), ['Alpha', 'Beta']);
+  assert.equal(eff.workItemProjects.find((p) => p.name === 'Alpha').id, 'a1');
+  assert.ok(eff.projectSet.has('alpha'));
+  // Org map routes each project to its organization.
+  assert.equal(eff.projectOrgMap.get('alpha'), 'https://microsoft.visualstudio.com');
+  assert.equal(eff.projectOrgMap.get('beta'), 'https://dev.azure.com/OtherOrg');
 });
