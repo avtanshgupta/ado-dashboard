@@ -1,22 +1,26 @@
-# 🛡️ Azure DevOps PR Dashboard
+# 📊 Azure DevOps Dashboard
 
-A multi-user dashboard to manage pull requests **and** pipelines across your Azure
-DevOps repositories in `microsoft.visualstudio.com` / **Windows Defender** — for
-example the `WD.Client` family:
+A multi-user dashboard to manage **pull requests**, **pipelines**, and **work items**
+across your Azure DevOps **projects** — in one **or more organizations**. New users
+start monitoring three projects by default — **Windows Defender**, **OS**, and
+**WDATP** (all in `microsoft.visualstudio.com`) — and every kind of data (PRs,
+builds, repos, work items, queries) is scoped to the projects you monitor.
 
-- `WD.Client.Linux` (monitored by default)
-- `WD.Client.Mac`
-- `WD.Client.Linux.eBPF`
-- `WD.Client.Linux.Installer`
-
-Repositories are **per-user configurable** — add any repo in the project by pasting
-its link; new users start with only `WD.Client.Linux` monitored.
+**Projects are per-user configurable** — add another by pasting its URL under
+**Settings → General → Projects**, including projects in **other organizations**
+(e.g. `https://dev.azure.com/MSecProductSecurity/…`); the same Azure DevOps token
+is used against each org you can access. Within those projects you then track the
+specific repositories and pipelines you care about (added by link), while **all
+work items** under the monitored projects are available automatically.
 
 It surfaces the PRs you created, PRs assigned to you for review, and open PRs from
 your team — with comment counts, CI/pipeline status, and review status — and lets
 you **review inline** (per-file diff + comment / reply / resolve), **create**,
 **merge**, **vote**, manage reviewers, and **re-trigger pipelines** without leaving
-the app. An **Action Center** ranks what needs you next.
+the app. The **Work Items** section does the same for bugs, stories, tasks and
+features — list, filter, edit, comment, and link across every configured project.
+An **Action Center** ranks what needs you next, and every list keeps its last data
+cached so pages open instantly and refresh in the background.
 
 > **Multi-user.** Each person signs in with their **own** Azure DevOps identity and
 > acts with their **own** permissions — locally via the Azure CLI (`az login`), or
@@ -32,7 +36,7 @@ the app. An **Action Center** ranks what needs you next.
 | Area | What you get |
 | --- | --- |
 | **Sign-in** | Locally: automatic via the Azure CLI (`az login`). Hosted: paste a short-lived Azure token, kept in a per-user vault **encrypted at rest** (AES-256-GCM). Each user authenticates as themselves; only **MDE Linux** group members are admitted. |
-| **Project Overview** | The landing page — a cross-cutting summary of the PRs and pipelines that need your attention, with quick links into every area. |
+| **Project Overview** | The landing page — a cross-cutting summary of the PRs, pipelines and **work items** that need your attention, with quick links into every area. |
 | **Action Center** | A prioritized *"what needs me next"* inbox — PRs waiting on your review, your PRs that are blocked or mergeable, stale threads — each with **follow**, **snooze**, and **dismiss**. |
 | **PR Overview** | Three cards — **My / Assigned / Team**, each showing **Open / Draft / Closed** — plus stacked + per-repo charts, and a **timeline filter** (1mo … 2y). |
 | **My Pull Requests** | Every PR you authored. State, active comments, pipeline, review status, **Proof-of-Presence** badge. Merge (only when mergeable) / re-run CI inline. |
@@ -45,12 +49,16 @@ the app. An **Action Center** ranks what needs you next.
 | **Bulk actions** | Select multiple PRs and act on them in one go. |
 | **Merge gating** | The Merge button appears **only when the PR is actually mergeable** (active, no conflicts, all blocking policies green). Otherwise it shows what's blocking. |
 | **Pipelines** | Overview, trigger runs (pick branch + parameters), run history with stage/job/log drill-down, retry (whole run or **failed stages only**), CSV export of runs, and **Analytics** (success-rate trend, mean/median duration, flaky-commit detection). |
+| **Work Items** | A full **Work Items** section across all configured projects: **Overview** (rollup by state category / type / assignee, aging, weekly created-vs-closed throughput, SLA breaches), plus **Assigned to Me**, **Created by Me**, **Team**, **Following / @mentioned**, **Current Sprint**, and **Saved Queries** tabs. |
+| **Work Item detail** | Fields (state, assignee, area/iteration, priority/severity, story points, tags), **Description / Repro steps / Acceptance criteria** rendered as sanitized HTML, **discussion** (comments), **links & relations** (parent/children/related + linked pull requests), and full **inline editing** — change state (valid transitions only), reassign, edit title/tags/priority, comment, and link/unlink work items. |
+| **Create work item** | Open a new work item from the app — pick project + type, then title, description, area/iteration path, priority, and tags. |
 | **Stand-up** | A generated daily stand-up summary of your PR activity (Markdown + `.ics` calendar download). |
-| **Settings** | In-dashboard, per-user: repositories to monitor, team members, Assigned review-group aliases (auto-resolved), pipelines, default time window, **SLA/aging thresholds**, **comment templates**, **saved views**, **muted repos**, chat webhooks, and notification preferences. New users start with only **WD.Client.Linux** monitored; everything else empty. |
+| **Settings** | In-dashboard, per-user: **monitored projects** (add by URL — the scope for all data), repositories & pipelines to track (within those projects), team members, Assigned review-group aliases (auto-resolved), default time window, **SLA/aging thresholds**, **comment templates**, **saved views**, **muted repos**, **work-item saved queries** (add by pasting a query link), and notification preferences. New users start with **Windows Defender / OS / WDATP** monitored. |
 | **Command palette** | **⌘K / Ctrl-K** to jump anywhere, run actions, and switch theme. |
 | **Onboarding tour** | A one-minute guided tour of where everything lives. |
-| **Filter / sort / search** | Per-repo chips, **label filter**, **state filter (defaults to Open)**, **time-range filter (defaults to 6 months)**, sortable columns, **pagination**, free-text filter, **saved views**, and a global search across **PRs & pipelines**. Filters persist across reloads. |
-| **Notifications** | In-app **bell** with **live updates** (Server-Sent Events) + unread badge and preferences (new PRs, comments, review changes, pipeline pass/fail, closes). Optional **email digests** (SMTP) and **Slack / Microsoft Teams** webhooks. |
+| **Filter / sort / search** | Per-repo chips, **label filter**, **multi-select state filter (defaults to Open)**, **time-range filter (defaults to 6 months)**, sortable columns, **pagination**, free-text filter, **saved views**, and a global search across **PRs & pipelines** (⌘K also jumps to a work item by `#id`). Work items add **type / state-category / assignee / area / iteration / tag / priority / project** filters with their own saved views. Filters persist across reloads. |
+| **Instant loads (SWR)** | Every list, overview and detail view **caches its last payload** (per tab, in `sessionStorage`) and renders it immediately on revisit while fetching fresh data in the background — with an *"Updating…"* indicator. The cache is wiped on sign-out. |
+| **Notifications** | In-app **bell** with **live updates** (Server-Sent Events) + unread badge and preferences (new PRs, comments, review changes, pipeline pass/fail, closes), plus optional **desktop / browser push**. |
 | **Theme** | Light / Dark / System (follows your OS). |
 | **Export** | CSV download per category (My / Assigned / Assigned-team / Team, incl. labels) and per-pipeline run history; "PDF" via browser print. |
 | **Responsive** | Works on desktop, tablet, and mobile, with keyboard-accessible tables & dialogs. |
@@ -130,30 +138,43 @@ under `server/data/` (`auth.json`, `users/`, `notif/`).
 
 ### Settings (in the dashboard)
 Open **Settings** in the app to configure (each setting is **personal to you**):
-- Repositories to monitor (add by pasting a repo link)
-- Team members (drive **Team PRs**)
+- **Monitored projects** — add by pasting a project URL, from **any organization**
+  you can access (e.g. `https://dev.azure.com/MSecProductSecurity/<project>` as well
+  as `https://microsoft.visualstudio.com/<project>`). This is the scope for
+  everything: PRs, builds, repos, work items and queries are all limited to these
+  projects. Defaults to **Windows Defender / OS / WDATP**.
+- Repositories to monitor (add by pasting a repo link — must be within a monitored project)
+- Team members (drive **Team PRs** and the Work Items → Team tab)
 - **Assigned-to-me** review-group aliases (type an alias; it's auto-resolved to the
   group display name via Azure DevOps)
-- Monitored pipelines
+- Monitored pipelines (within a monitored project)
+- **Work-item saved queries** — run them under Work Items → Queries; add by pasting a
+  query **link** or enter the fields directly. (All work items under the monitored
+  projects are tracked automatically — no area paths needed.)
 - Default time window and **SLA/aging** thresholds
 - **Comment templates**, **saved views**, and **muted repos**
-- Notification preferences, **email digests**, and **Slack / Teams** webhooks
+- Notification preferences (in-app + **desktop / browser push**)
 
-These persist to `server/data/users/<your-id>.json`. New users start with only
-**WD.Client.Linux** monitored and everything else empty — configure your own.
+These persist to `server/data/users/<your-id>.json`. New users start with the three
+default projects monitored; add repos, pipelines and team members to populate the
+dashboard.
 
 ### Defaults & org constants — `server/config/app.config.json`
 Seeds each user's settings on first run and holds org-level constants.
 ```jsonc
 {
   "organizationUrl": "https://microsoft.visualstudio.com",
-  "project": "Windows Defender",
+  "project": "Windows Defender",           // org default / fallback project
   "projectId": "22c8b9b6-...",
-  // Optional: monitor repos/pipelines across more than one project. Defaults to
-  // the single { project, projectId } above when omitted.
-  // "projects": [{ "name": "Windows Defender", "id": "22c8b9b6-..." }],
+  // Monitored projects seeded into each new user's settings. Data (PRs, builds,
+  // repos, work items, queries) is scoped to the user's monitored projects.
+  "projects": [
+    { "name": "Windows Defender", "id": "22c8b9b6-..." },
+    { "name": "OS", "id": "8d47e068-..." },
+    { "name": "WDATP", "id": "f0333b3d-..." }
+  ],
   "adoResourceId": "499b84ac-...",
-  "repositories": ["WD.Client.Linux"],  // seed monitored repos (only Linux by default)
+  "repositories": ["WD.Client.Linux"],  // seed monitored repos (within a project)
   "team": [],                            // seed Team-PR members (empty by default)
   "reviewerGroups": [],                  // seed Assigned-to-me group aliases
   "defaultTimeRangeMonths": 6,
@@ -183,14 +204,6 @@ COOKIE_SECURE=false        # true when served over HTTPS
 # Vault tokens are encrypted (AES-256-GCM). Set a 32-byte key (64 hex / base64)
 # to hold it outside DATA_DIR; otherwise a keyfile is auto-generated in DATA_DIR.
 # TOKEN_ENC_KEY=
-
-# ---- Email notifications (optional — in-app always works) ----
-SMTP_HOST=              # leave empty to disable email
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=
-SMTP_PASS=
-NOTIFY_EMAIL_FROM=      # defaults to SMTP_USER
 ```
 
 ---
@@ -219,7 +232,7 @@ web/  (React + Vite)  ──/api proxy──►  server/  (Node + Express)  ─�
 | --- | --- | --- |
 | GET/POST | `/api/auth/me · /login · /token · /logout` | Session bootstrap + token-paste sign-in (public); enforces MDE Linux group membership |
 | GET/PUT | `/api/config` | Settings (repos, team, aliases, prefs) + your identity — **validated** on write |
-| POST | `/api/resolve-group` · GET `/api/identities?query=` · `/api/repos/resolve` | Resolve an alias → ADO group; search users/groups; resolve a repo link |
+| POST | `/api/resolve-group` · GET `/api/identities?query=` · `/api/repos/resolve` · `/api/projects/resolve` | Resolve an alias → ADO group; search users/groups; resolve a repo / project link |
 | GET | `/api/overview · /summary · /pr-analytics · /standup(.ics)` | Rollups, project summary, cycle-time analytics, stand-up |
 | GET | `/api/action-center` · POST `/snooze · /dismiss` · `/follows` | Prioritized inbox + follow / snooze / dismiss overlay |
 | GET | `/api/prs/created · /assigned · /team` | PR lists (enriched, incl. labels) |
@@ -229,8 +242,10 @@ web/  (React + Vite)  ──/api proxy──►  server/  (Node + Express)  ─�
 | POST/PATCH | `/api/prs/:repo/:id/threads[/inline\|/batch\|/:tid/comments]` | Comment / reply / resolve threads |
 | POST/PATCH/DELETE | `/api/prs/:repo/:id/reviewers[/:id]` · `/workitems[/:id]` | Manage reviewers; link / unlink work items |
 | GET/POST | `/api/pipelines · /:id/runs · /:id/analytics · /overview · /:id/queue · /runs/:id/retry[-failed]` | Pipelines, runs, analytics, trigger & retry |
+| GET | `/api/workitems/assigned · /created · /team · /following · /sprint · /overview · /summary · /types` | Work-item lists (per tab, WIQL across the project union), rollups, type metadata |
+| GET | `/api/workitems/:id · /queries/:queryId/run · /queries/resolve?ref= · /export.csv?tab=` | Work-item detail; run a saved query; resolve a query from a link; CSV export |
+| POST/PATCH | `/api/workitems · /:id · /:id/comments · /:id/links[/remove]` | Create a work item; update fields/state/assignee/tags (json-patch + `rev` guard); comment; link / unlink |
 | GET | `/api/stream` (SSE) · `/api/notifications` · POST `/poll · /read` · PUT `/preferences` | Live updates + notifications |
-| POST | `/api/webhooks/test` | Test a Slack / Teams webhook |
 | GET | `/api/export.csv?category=created\|assigned\|assignedTeam\|team` · `/api/pipelines/:id/export.csv` | CSV export |
 
 > **Security:** state-changing requests require an `X-Requested-With` header (CSRF

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Dashboard to manage Azure DevOps pull requests across the WD.Client repositories",
+  "description": "Multi-user dashboard to manage Azure DevOps pull requests, pipelines and work items across your repositories",
   "engines": {
     "node": ">=20"
   },
