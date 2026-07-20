@@ -1,103 +1,290 @@
 # 📊 Azure DevOps Dashboard
 
-A multi-user dashboard to manage **pull requests**, **pipelines**, and **work items**
-across your Azure DevOps **projects** — in one **or more organizations**. New users
-start monitoring three projects by default — **Windows Defender**, **OS**, and
-**WDATP** (all in `microsoft.visualstudio.com`) — and every kind of data (PRs,
-builds, repos, work items, queries) is scoped to the projects you monitor.
+![Node](https://img.shields.io/badge/node-%E2%89%A520-3c873a)
+![React](https://img.shields.io/badge/react-18-61dafb)
+![Express](https://img.shields.io/badge/express-4-000000)
+![Tests](https://img.shields.io/badge/tests-node%3Atest-blueviolet)
+![License](https://img.shields.io/badge/license-Internal-blue)
 
-**Projects are per-user configurable** — add another by pasting its URL under
-**Settings → General → Projects**, including projects in **other organizations**
-(e.g. `https://dev.azure.com/MSecProductSecurity/…`); the same Azure DevOps token
-is used against each org you can access. Within those projects you then track the
-specific repositories and pipelines you care about (added by link), while **all
-work items** under the monitored projects are available automatically.
+A multi-user web dashboard for managing **pull requests**, **pipelines**, and
+**work items** across your Azure DevOps **projects** — spanning one **or more
+organizations** — from a single place. Each person signs in with their **own**
+Azure DevOps identity and acts with their **own** permissions; there is no shared
+service account and no database to run.
 
-It surfaces the PRs you created, PRs assigned to you for review, and open PRs from
-your team — with comment counts, CI/pipeline status, and review status — and lets
-you **review inline** (per-file diff + comment / reply / resolve), **create**,
-**merge**, **vote**, manage reviewers, and **re-trigger pipelines** without leaving
-the app. The **Work Items** section does the same for bugs, stories, tasks and
-features — list, filter, edit, comment, and link across every configured project.
-An **Action Center** ranks what needs you next, and every list keeps its last data
-cached so pages open instantly and refresh in the background.
+New users start monitoring three projects by default — **Windows Defender**,
+**OS**, and **WDATP** (all in `microsoft.visualstudio.com`) — and every kind of
+data (PRs, builds, repositories, work items, queries) is scoped to the projects
+each user chooses to monitor. Add another project — including one in a **different
+organization** (e.g. `https://dev.azure.com/MSecProductSecurity/…`) — by pasting
+its URL under **Settings → General → Projects**; the same Azure token is used
+against every org you can access.
 
-> **Multi-user.** Each person signs in with their **own** Azure DevOps identity and
-> acts with their **own** permissions — locally via the Azure CLI (`az login`), or
-> when hosted by pasting a short-lived Azure token. The **only** login gate is
-> **group membership**: you may sign in iff you're a member of the
-> `mdelinux@microsoft.com` (**MDE Linux**) group. Every user gets their own
-> settings, notifications, and data.
+> **Live instance:** https://ado-dashboard.azurewebsites.net
 
 ---
 
-## ✨ Features
+## Table of contents
 
-| Area | What you get |
+- [Highlights](#-highlights)
+- [Tech stack](#-tech-stack)
+- [Architecture](#-architecture)
+- [Project structure](#-project-structure)
+- [Quick start](#-quick-start)
+- [Authentication & access control](#-authentication--access-control)
+- [Configuration](#-configuration)
+- [Deployment](#-deployment)
+- [API reference](#-api-reference)
+- [Testing & quality](#-testing--quality)
+- [Security](#-security)
+- [Troubleshooting](#-troubleshooting)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
+
+## ✨ Highlights
+
+**Pull requests**
+- **My / Assigned / Team** views with state, active-comment counts, CI/pipeline
+  status, review status and a Proof-of-Presence badge.
+- **Assigned to Me** also surfaces PRs where one of your configured review groups
+  is a reviewer (each tagged with a 👥 badge).
+- **Inline review** without leaving the app: per-file diff, comment / reply /
+  resolve threads (general or line-anchored), and a batched *start-a-review* flow.
+- **Full PR lifecycle:** create, merge (only when actually mergeable), vote,
+  enable/cancel auto-complete, publish/convert-to-draft, abandon/reactivate,
+  manage reviewers, link/unlink work items, and re-run gates — with a
+  **merge-blocked-by** breakdown when a PR isn't ready.
+- **Bulk actions** across selected PRs.
+
+**Pipelines**
+- Overview, trigger runs (pick branch + parameters), run history with
+  stage/job/log drill-down, retry (whole run or **failed stages only**), CSV
+  export, and **Analytics** (success-rate trend, mean/median duration, flaky-commit
+  detection).
+
+**Work items**
+- A full section across every monitored project: **Overview** (rollups by state
+  category / type / assignee, aging, weekly created-vs-closed throughput, SLA
+  breaches) plus **Assigned / Created / Team / Following / Current Sprint / Saved
+  Queries** tabs.
+- **Detail** view with sanitized rich-text (description / repro / acceptance),
+  discussion, links & relations (incl. linked PRs), and inline editing (valid
+  state transitions only, reassign, tags, priority, comment, link/unlink).
+- **Create** a work item, and add **saved queries** by pasting a query link.
+
+**Across the app**
+- **Project Overview** landing page and a prioritized **Action Center** inbox
+  (*what needs me next*) with follow / snooze / dismiss.
+- **Stale-while-revalidate caching:** every list/overview/detail renders its last
+  payload instantly (per tab, in `sessionStorage`) and refreshes in the background
+  with an *"Updating…"* indicator; the cache is wiped on sign-out.
+- **Filter / sort / search:** per-repo chips, multi-select state filter, time-range
+  filter, sortable + paginated columns, free-text filter, **saved views**, and a
+  global search (⌘K / Ctrl-K command palette; jump to a work item by `#id`).
+- **In-app notifications** with live updates over **Server-Sent Events**, an unread
+  badge, per-event preferences, and optional desktop/browser push.
+- **Stand-up** generator (Markdown + `.ics`), CSV export, guided onboarding tour,
+  and Light / Dark / System themes.
+
+---
+
+## 🧱 Tech stack
+
+| Layer | Technology |
 | --- | --- |
-| **Sign-in** | Locally: automatic via the Azure CLI (`az login`). Hosted: paste a short-lived Azure token, kept in a per-user vault **encrypted at rest** (AES-256-GCM). Each user authenticates as themselves; only **MDE Linux** group members are admitted. |
-| **Project Overview** | The landing page — a cross-cutting summary of the PRs, pipelines and **work items** that need your attention, with quick links into every area. |
-| **Action Center** | A prioritized *"what needs me next"* inbox — PRs waiting on your review, your PRs that are blocked or mergeable, stale threads — each with **follow**, **snooze**, and **dismiss**. |
-| **PR Overview** | Three cards — **My / Assigned / Team**, each showing **Open / Draft / Closed** — plus stacked + per-repo charts, and a **timeline filter** (1mo … 2y). |
-| **My Pull Requests** | Every PR you authored. State, active comments, pipeline, review status, **Proof-of-Presence** badge. Merge (only when mergeable) / re-run CI inline. |
-| **Assigned to Me** | Active PRs where you're a reviewer **or one of your review groups is involved** (configurable), your open vs resolved threads, re-run CI. |
-| **Team PRs** | Open PRs from your configured team members across all repos. |
-| **Create PR** | Open a new PR from the app — pick source/target branch, title, description, draft flag, and reviewers. |
-| **Inline review** | View the **per-file diff** and **comment, reply, and resolve** threads (general or line-anchored), including a batched *start-a-review* flow — no need to switch to ADO. |
-| **PR Detail** | Description & comments rendered as **Markdown**, commits & files changed, per-file **diff**, pipelines (per-build re-run), **collapsible discussion threads** (open-only by default, dropdown for resolved/all), timeline, **reviewer management** (add / remove / toggle required), **linked work items** (link / unlink), and a **merge-blocked-by** breakdown. |
-| **PR actions** | Merge (only when mergeable), enable/cancel auto-complete, publish draft, **convert to draft**, **abandon / reactivate**, re-run gates, cast vote. |
-| **Bulk actions** | Select multiple PRs and act on them in one go. |
-| **Merge gating** | The Merge button appears **only when the PR is actually mergeable** (active, no conflicts, all blocking policies green). Otherwise it shows what's blocking. |
-| **Pipelines** | Overview, trigger runs (pick branch + parameters), run history with stage/job/log drill-down, retry (whole run or **failed stages only**), CSV export of runs, and **Analytics** (success-rate trend, mean/median duration, flaky-commit detection). |
-| **Work Items** | A full **Work Items** section across all configured projects: **Overview** (rollup by state category / type / assignee, aging, weekly created-vs-closed throughput, SLA breaches), plus **Assigned to Me**, **Created by Me**, **Team**, **Following / @mentioned**, **Current Sprint**, and **Saved Queries** tabs. |
-| **Work Item detail** | Fields (state, assignee, area/iteration, priority/severity, story points, tags), **Description / Repro steps / Acceptance criteria** rendered as sanitized HTML, **discussion** (comments), **links & relations** (parent/children/related + linked pull requests), and full **inline editing** — change state (valid transitions only), reassign, edit title/tags/priority, comment, and link/unlink work items. |
-| **Create work item** | Open a new work item from the app — pick project + type, then title, description, area/iteration path, priority, and tags. |
-| **Stand-up** | A generated daily stand-up summary of your PR activity (Markdown + `.ics` calendar download). |
-| **Settings** | In-dashboard, per-user: **monitored projects** (add by URL — the scope for all data), repositories & pipelines to track (within those projects), team members, Assigned review-group aliases (auto-resolved), default time window, **SLA/aging thresholds**, **comment templates**, **saved views**, **muted repos**, **work-item saved queries** (add by pasting a query link), and notification preferences. New users start with **Windows Defender / OS / WDATP** monitored. |
-| **Command palette** | **⌘K / Ctrl-K** to jump anywhere, run actions, and switch theme. |
-| **Onboarding tour** | A one-minute guided tour of where everything lives. |
-| **Filter / sort / search** | Per-repo chips, **label filter**, **multi-select state filter (defaults to Open)**, **time-range filter (defaults to 6 months)**, sortable columns, **pagination**, free-text filter, **saved views**, and a global search across **PRs & pipelines** (⌘K also jumps to a work item by `#id`). Work items add **type / state-category / assignee / area / iteration / tag / priority / project** filters with their own saved views. Filters persist across reloads. |
-| **Instant loads (SWR)** | Every list, overview and detail view **caches its last payload** (per tab, in `sessionStorage`) and renders it immediately on revisit while fetching fresh data in the background — with an *"Updating…"* indicator. The cache is wiped on sign-out. |
-| **Notifications** | In-app **bell** with **live updates** (Server-Sent Events) + unread badge and preferences (new PRs, comments, review changes, pipeline pass/fail, closes), plus optional **desktop / browser push**. |
-| **Theme** | Light / Dark / System (follows your OS). |
-| **Export** | CSV download per category (My / Assigned / Assigned-team / Team, incl. labels) and per-pipeline run history; "PDF" via browser print. |
-| **Responsive** | Works on desktop, tablet, and mobile, with keyboard-accessible tables & dialogs. |
+| Frontend | React 18, React Router 6, Vite 5, Recharts, `marked` + DOMPurify (safe Markdown/HTML), `lucide-react` icons |
+| Backend | Node ≥ 20, Express 4, `AsyncLocalStorage` per-request context, native `fetch` to the Azure DevOps REST API (v7.1) |
+| Auth | Azure CLI (`az`) locally, or a per-user token vault (AES-256-GCM at rest) with an opaque session cookie when hosted |
+| Storage | **No database** — per-user JSON files under `DATA_DIR` (`auth.json`, `users/`, `notif/`) |
+| Tests / lint | Node's built-in `node:test`, ESLint 9 (`eslint-plugin-react`, `-react-hooks`) |
+| Packaging | Multi-stage `Dockerfile` (single image serves SPA + API on `:4000`) |
+
+---
+
+## 🏗 Architecture
+
+```
+web/  (React + Vite SPA)  ──/api──►  server/  (Node + Express)  ──REST v7.1──►  Azure DevOps
+        rendered same-origin           per-request user context                (1..N orgs)
+        in production                   bounded concurrency + short cache
+```
+
+- **`server/`** authenticates each request as the signed-in user — locally via the
+  Azure CLI, or via the per-user token vault (browser session cookie) when hosted —
+  and runs every request inside that user's `AsyncLocalStorage` context. It fans out
+  to the ADO REST API with **bounded concurrency** and a short per-user cache,
+  exposes clean JSON endpoints and PR/pipeline/work-item actions, and streams live
+  updates over **Server-Sent Events**. A single group-membership check gates sign-in.
+- **`web/`** renders the dashboard, charts, tables, detail views, inline diffs, the
+  settings editor, command palette, and notifications. In production the built SPA is
+  served same-origin by the Node server; in dev, Vite proxies `/api` to `:4000`.
+- **Multi-org:** each monitored project carries an `org` base URL; the ADO client
+  resolves the correct organization per project for every REST call, so a single AAD
+  token can drive several organizations at once.
+
+---
+
+## 📁 Project structure
+
+```
+ado-pr-dashboard/
+├── server/                       # Node + Express API
+│   ├── src/
+│   │   ├── index.js              # app bootstrap; serves web/dist in production
+│   │   ├── config.js             # .env + app.config.json loader
+│   │   ├── routes/               # api.js, auth.js
+│   │   ├── middleware/           # sessionContext, csrf, rateLimit, securityHeaders
+│   │   ├── services/             # pr, pipeline, workItem, notifications, stream, …
+│   │   └── lib/                  # adoClient, userConfig, crypto, analytics, links, …
+│   ├── config/app.config.json    # org defaults & per-user seeds
+│   ├── test/                     # node:test suites
+│   └── data/                     # per-user JSON state (gitignored)
+├── web/                          # React + Vite SPA
+│   ├── src/
+│   │   ├── pages/                # Overview, PRs, Pipelines, WorkItems, Settings, …
+│   │   ├── components/           # tables, filters, charts, tour, command palette
+│   │   └── lib/                  # api client, hooks, SWR cache, formatters
+│   └── test/                     # node:test suites
+├── scripts/token-pusher.sh       # keep a hosted session refreshed
+├── dev.mjs                       # concurrent dev runner (API + Vite)
+├── Dockerfile                    # multi-stage build → single runtime image
+└── package.json                  # root scripts: install:all, dev, build, test, lint
+```
 
 ---
 
 ## 🚀 Quick start
 
 ### Prerequisites
-- **Node.js 20+** (the web build's `marked` dependency requires Node ≥ 20).
-- **Azure CLI** signed in: run `az login` (verify with `az account show`).
+- **Node.js ≥ 20** (the web build's `marked` dependency requires it).
+- **Azure CLI** signed in for local use: `az login` (verify with `az account show`).
 
-### Install & run
+### Install & run (development)
 ```bash
-cd ado-pr-dashboard
-npm run install:all     # installs server/ and web/ deps
-npm run dev             # backend (:4000) + frontend (:5173)
+npm run install:all     # install server/ and web/ dependencies
+npm run dev             # API on :4000 + Vite dev server on :5173 (via dev.mjs)
 ```
-Open **http://localhost:5173** — locally it loads straight into the dashboard,
+Open **http://localhost:5173**. Locally the app loads straight into the dashboard,
 authenticated as your `az`-signed-in account.
-
-### Validate (lint + tests)
-```bash
-npm run lint            # ESLint over server/src + web/src
-npm test                # server (node:test) + web (node:test) suites
-```
 
 ### Production (single process)
 ```bash
-npm run build           # builds the frontend into web/dist
-npm start               # backend serves the UI + API on :4000
+npm run build           # builds the SPA into web/dist
+npm start               # Node server serves the UI + API on :4000
 ```
 Open **http://localhost:4000**.
 
+### Useful scripts
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | API + web dev servers with hot reload |
+| `npm run build` | Build the SPA into `web/dist` |
+| `npm start` | Serve the built SPA + API from Node on `:4000` |
+| `npm test` | Run the `server/` and `web/` `node:test` suites |
+| `npm run lint` | ESLint over `server/src` and `web/src` |
+
+---
+
+## 🔐 Authentication & access control
+
+The dashboard is **multi-user**: every request runs as the signed-in user, using
+that user's own Azure DevOps permissions, with per-user settings, notifications,
+and cache. There are two ways to sign in:
+
+- **Local (default):** the server obtains a token from your local Azure CLI
+  (`az account get-access-token`) and acts as **you**. If you see *"Not signed in"*,
+  run `az login` and reload.
+- **Hosted / shared:** there is no local `az`, so users sign in on a token-paste
+  screen. Generate a token and paste it:
+  ```bash
+  az account get-access-token \
+    --resource 499b84ac-1321-427f-aa17-267ca6975798 \
+    --query accessToken -o tsv
+  # append | pbcopy (macOS), | clip (Windows) or | xclip -selection clipboard (Linux)
+  ```
+  The server stores a short-lived token per user in an **encrypted vault** keyed by
+  identity and hands the browser an opaque session cookie. The optional
+  [`scripts/token-pusher.sh`](scripts/token-pusher.sh) helper keeps a session
+  refreshed so users rarely re-paste. Set `DISABLE_AZ_FALLBACK=true` when hosting.
+
+**Access gate.** The single login gate is **group membership**: a user may sign in
+only if they belong to the `mdelinux@microsoft.com` (**MDE Linux**) Azure DevOps /
+AAD group. Membership is checked live (via the IdentityPicker) as the user and
+cached briefly, so removing someone from the group revokes access within minutes —
+there are no roles, allow-lists, or in-app user management. Change the group with
+`ALLOWED_GROUP`, or set it empty to admit anyone who can authenticate against the org.
+
+---
+
+## ⚙️ Configuration
+
+### In-app settings (per user)
+Open **Settings** in the app; every setting is personal to the signed-in user and
+persists to `server/data/users/<your-id>.json`:
+
+- **Monitored projects** — add by pasting a project URL, from **any organization**
+  you can access. This is the scope for everything (PRs, builds, repos, work items,
+  queries). Defaults to **Windows Defender / OS / WDATP**.
+- **Repositories** and **pipelines** to track — added by pasting a link within a
+  monitored project.
+- **Team members** — drive *Team PRs* and the *Work Items → Team* tab.
+- **Review-group aliases** — type an alias; it's auto-resolved to the group's
+  display name (surfaces those PRs under *Assigned to Me*).
+- **Work-item saved queries** — add by pasting a query link; run them under
+  *Work Items → Queries*. (All work items under monitored projects are tracked
+  automatically — no area paths needed.)
+- **Default time window**, **SLA / aging thresholds**, **comment templates**,
+  **saved views**, **muted repos**, and notification preferences.
+
+> Added items (projects, repos, pipelines, queries, aliases) are **removable, not
+> editable** — remove and re-add to change one.
+
+### Org defaults & seeds — `server/config/app.config.json`
+Seeds each new user's settings on first run and holds org-level constants:
+```jsonc
+{
+  "organizationUrl": "https://microsoft.visualstudio.com", // default org / identity
+  "project": "Windows Defender",                            // fallback project
+  "projectId": "22c8b9b6-…",
+  "projects": [                                             // seeded monitored projects
+    { "name": "Windows Defender", "id": "22c8b9b6-…" },
+    { "name": "OS",               "id": "8d47e068-…" },
+    { "name": "WDATP",            "id": "f0333b3d-…" }
+  ],
+  "adoResourceId": "499b84ac-…",   // AAD resource for ADO access tokens
+  "repositories": ["WD.Client.Linux"],
+  "team": [],
+  "reviewerGroups": [],
+  "defaultTimeRangeMonths": 6,
+  "pipelines": [ { "repo": "WD.Client.Linux", "definitionId": 137667, "name": "…" } ],
+  "cacheTtlSeconds": 45,           // per-user server cache TTL
+  "fetchConcurrency": 16           // max concurrent ADO REST calls
+}
+```
+
+### Server environment — `server/.env` (copy from `.env.example`)
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `4000` | Backend port (Vite dev proxies `/api` here) |
+| `ALLOWED_GROUP` | `mdelinux@microsoft.com` | Required group for sign-in; empty = open to the org |
+| `DISABLE_AZ_FALLBACK` | `false` | `true` when hosted (no local `az`) — force token-paste |
+| `COOKIE_SECURE` | `false` | `true` when served over HTTPS |
+| `COOKIE_NAME` | `ado_sid` | Session cookie name |
+| `DATA_DIR` | `server/data` | Persistent path for sessions/users/notifications |
+| `ALLOWED_ORIGINS` | *(unset)* | Comma-separated extra CORS origins (localhost allowed by default) |
+| `TOKEN_ENC_KEY` | *(auto)* | 32-byte key (64 hex / base64) to encrypt vault tokens; auto-generated in `DATA_DIR` if unset |
+
+---
+
+## 📦 Deployment
+
 ### Docker
-A multi-stage [`Dockerfile`](Dockerfile) builds the SPA and runs the server
-serving both the UI and API on port 4000. It defaults to hosted mode
-(`DISABLE_AZ_FALLBACK=true`, `COOKIE_SECURE=true`) and persists per-user state on
-a `/home/data` volume.
+The multi-stage [`Dockerfile`](Dockerfile) builds the SPA and runs the server
+serving both the UI and API on port `4000`. It defaults to hosted mode
+(`DISABLE_AZ_FALLBACK=true`, `COOKIE_SECURE=true`) and persists per-user state on a
+`/home/data` volume.
 ```bash
 docker build -t ado-pr-dashboard .
 docker run -p 4000:4000 -v ado-data:/home/data \
@@ -105,177 +292,121 @@ docker run -p 4000:4000 -v ado-data:/home/data \
   ado-pr-dashboard
 ```
 
-### How auth works
-The dashboard is **multi-user** — each request runs as the signed-in user, using
-that user's own Azure DevOps permissions (isolated per request via an
-`AsyncLocalStorage` context), with per-user settings, notifications, and cache.
-
-There are two ways to sign in:
-
-- **Local (default):** the server obtains a token from your local Azure CLI
-  (`az account get-access-token`) and acts as **you**. If you see a "Not signed in"
-  message, run `az login` and reload.
-- **Hosted / shared:** there's no local `az`, so users sign in on a token-paste
-  screen — run `az account get-access-token --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv`
-  and paste the printed token (append `| pbcopy` on macOS, `| clip` on Windows, or
-  `| xclip -selection clipboard` on Linux to copy it straight to the clipboard). The
-  server stores a short-lived token per user in a vault keyed by their identity and
-  hands the browser an opaque session cookie. The optional
-  [`scripts/token-pusher.sh`](scripts/token-pusher.sh) helper keeps a session
-  refreshed so users rarely re-paste. Set `DISABLE_AZ_FALLBACK=true` when hosting.
-
-**Access control.** There is a single login gate: the signed-in user must be a
-member of the **`mdelinux@microsoft.com`** (MDE Linux) Azure DevOps / AAD group.
-Membership is checked live against Azure DevOps (via the IdentityPicker) as the
-user, and cached briefly, so removing someone from the group revokes their access
-within minutes — there are no roles, allow-lists, or in-app user management to
-maintain. Change the group with the `ALLOWED_GROUP` env var, or set it empty to
-open the app to anyone who can authenticate against the org. Per-user state lives
-under `server/data/` (`auth.json`, `users/`, `notif/`).
-
-
-## ⚙️ Configuration
-
-### Settings (in the dashboard)
-Open **Settings** in the app to configure (each setting is **personal to you**):
-- **Monitored projects** — add by pasting a project URL, from **any organization**
-  you can access (e.g. `https://dev.azure.com/MSecProductSecurity/<project>` as well
-  as `https://microsoft.visualstudio.com/<project>`). This is the scope for
-  everything: PRs, builds, repos, work items and queries are all limited to these
-  projects. Defaults to **Windows Defender / OS / WDATP**.
-- Repositories to monitor (add by pasting a repo link — must be within a monitored project)
-- Team members (drive **Team PRs** and the Work Items → Team tab)
-- **Assigned-to-me** review-group aliases (type an alias; it's auto-resolved to the
-  group display name via Azure DevOps)
-- Monitored pipelines (within a monitored project)
-- **Work-item saved queries** — run them under Work Items → Queries; add by pasting a
-  query **link** or enter the fields directly. (All work items under the monitored
-  projects are tracked automatically — no area paths needed.)
-- Default time window and **SLA/aging** thresholds
-- **Comment templates**, **saved views**, and **muted repos**
-- Notification preferences (in-app + **desktop / browser push**)
-
-These persist to `server/data/users/<your-id>.json`. New users start with the three
-default projects monitored; add repos, pipelines and team members to populate the
-dashboard.
-
-### Defaults & org constants — `server/config/app.config.json`
-Seeds each user's settings on first run and holds org-level constants.
-```jsonc
-{
-  "organizationUrl": "https://microsoft.visualstudio.com",
-  "project": "Windows Defender",           // org default / fallback project
-  "projectId": "22c8b9b6-...",
-  // Monitored projects seeded into each new user's settings. Data (PRs, builds,
-  // repos, work items, queries) is scoped to the user's monitored projects.
-  "projects": [
-    { "name": "Windows Defender", "id": "22c8b9b6-..." },
-    { "name": "OS", "id": "8d47e068-..." },
-    { "name": "WDATP", "id": "f0333b3d-..." }
-  ],
-  "adoResourceId": "499b84ac-...",
-  "repositories": ["WD.Client.Linux"],  // seed monitored repos (within a project)
-  "team": [],                            // seed Team-PR members (empty by default)
-  "reviewerGroups": [],                  // seed Assigned-to-me group aliases
-  "defaultTimeRangeMonths": 6,
-  "pipelines": [                         // seed monitored pipelines (per repo)
-    { "repo": "WD.Client.Linux", "definitionId": 137667, "name": "WD.Client.Linux (CI Gate)" }
-  ],
-  "cacheTtlSeconds": 45,
-  "fetchConcurrency": 16
-}
-```
-
-### Server env — `server/.env` (optional; copy from `.env.example`)
+### Azure App Service (Linux, Node 20/22)
+The live instance runs as a zip deploy — the SPA is prebuilt and the server serves
+`web/dist`, so **build is disabled** on the platform.
 ```bash
-PORT=4000
+APP=ado-dashboard ; RG=<resource-group>
 
-# ---- Access ----
-ALLOWED_GROUP=mdelinux@microsoft.com  # login gate: required group membership
-                                      # (set empty to open to the whole org)
-DISABLE_AZ_FALLBACK=false  # true when hosted (no local `az`) — force token-paste
-# ---- Sessions / cookies ----
-COOKIE_SECURE=false        # true when served over HTTPS
-# COOKIE_NAME=ado_sid      # session cookie name
-# DATA_DIR=/home/data      # persistent path for sessions/users on a host
-# ALLOWED_ORIGINS=         # comma-separated extra CORS origins (localhost allowed by default)
+# 1) One-time app settings
+az webapp config appsettings set -g "$RG" -n "$APP" --settings \
+  DISABLE_AZ_FALLBACK=true COOKIE_SECURE=true DATA_DIR=/home/data \
+  SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+  TOKEN_ENC_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+az webapp config set -g "$RG" -n "$APP" --startup-file "node server/src/index.js"
 
-# ---- Token encryption at rest ----
-# Vault tokens are encrypted (AES-256-GCM). Set a 32-byte key (64 hex / base64)
-# to hold it outside DATA_DIR; otherwise a keyfile is auto-generated in DATA_DIR.
-# TOKEN_ENC_KEY=
+# 2) Build the SPA and stage server + production deps + web/dist
+npm run build
+rm -rf dist && mkdir -p dist/server dist/web
+cp -r server/src server/config server/package.json server/package-lock.json dist/server/
+cp -r web/dist dist/web/dist
+( cd dist/server && npm ci --omit=dev )
+( cd dist && zip -rq ../deploy.zip . )
+
+# 3) Deploy (async; poll SCM /api/deployments for status)
+az webapp deploy -g "$RG" -n "$APP" --type zip --src-path deploy.zip \
+  --clean true --restart true --async true
 ```
+`DATA_DIR=/home/data` keeps per-user logins on persistent storage across deploys.
+Provide `TOKEN_ENC_KEY` (ideally from Key Vault) so vault tokens are encrypted with
+a key held outside the data volume.
 
 ---
 
-## 🏗️ Architecture
+## 📚 API reference
 
-```
-web/  (React + Vite)  ──/api proxy──►  server/  (Node + Express)  ──REST──►  Azure DevOps
-```
-
-- **server/** authenticates each request as the signed-in user — locally via the
-  Azure CLI, or via a per-user token vault (browser session cookie) when hosted —
-  and runs every request in that user's own `AsyncLocalStorage` context. It
-  aggregates the REST API with bounded concurrency + a short per-user cache, and
-  exposes clean JSON endpoints, PR/pipeline actions, and a **Server-Sent Events**
-  stream for live updates. A single group-membership check gates who may sign in.
-- **web/** renders the dashboard, charts (Recharts), tables, detail views, inline
-  diffs, settings editor, command palette, and notifications.
-- **Tests** live in `server/test/` and `web/test/` (Node's built-in `node:test`);
-  a multi-stage [`Dockerfile`](Dockerfile) ships the whole thing as one image.
-
-### Key REST endpoints (backend)
-> Representative, not exhaustive — see [`server/src/routes/`](server/src/routes) for the full surface. `GET /api/health` is public; everything else runs in the authenticated session context.
+`GET /api/health` is public; every other `/api` route runs in the authenticated
+session context. Representative surface — see
+[`server/src/routes/`](server/src/routes) for the full set.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET/POST | `/api/auth/me · /login · /token · /logout` | Session bootstrap + token-paste sign-in (public); enforces MDE Linux group membership |
-| GET/PUT | `/api/config` | Settings (repos, team, aliases, prefs) + your identity — **validated** on write |
-| POST | `/api/resolve-group` · GET `/api/identities?query=` · `/api/repos/resolve` · `/api/projects/resolve` | Resolve an alias → ADO group; search users/groups; resolve a repo / project link |
-| GET | `/api/overview · /summary · /pr-analytics · /standup(.ics)` | Rollups, project summary, cycle-time analytics, stand-up |
-| GET | `/api/action-center` · POST `/snooze · /dismiss` · `/follows` | Prioritized inbox + follow / snooze / dismiss overlay |
-| GET | `/api/prs/created · /assigned · /team` | PR lists (enriched, incl. labels) |
-| POST | `/api/prs` | Create a PR |
-| GET | `/api/prs/:repo/:id · /:id/diff` | Detail (commits, files, threads, PoP, work items, merge blockers) + per-file diff |
+| GET/POST | `/api/auth/me · /login · /token · /logout` | Session bootstrap + token-paste sign-in (public) |
+| GET/PUT | `/api/config` | Per-user settings + identity (validated on write) |
+| POST/GET | `/api/resolve-group · /identities?query= · /repos/resolve · /projects/resolve · /pipelines/resolve` | Resolve an alias/repo/project/pipeline link |
+| GET | `/api/overview · /summary · /pr-analytics · /standup(.ics)` | Rollups, project summary, analytics, stand-up |
+| GET/POST | `/api/action-center · /snooze · /dismiss · /follows` | Prioritized inbox + follow / snooze / dismiss |
+| GET/POST | `/api/prs/created · /assigned · /team` · `POST /api/prs` | PR lists (enriched) and PR creation |
+| GET | `/api/prs/:repo/:id · /:id/diff` | Detail (commits, files, threads, PoP, WIs, blockers) + diff |
 | POST | `/api/prs/:repo/:id/merge · /requeue · /vote · /publish · /autocomplete · /abandon · /reactivate · /draft` | PR actions |
-| POST/PATCH | `/api/prs/:repo/:id/threads[/inline\|/batch\|/:tid/comments]` | Comment / reply / resolve threads |
-| POST/PATCH/DELETE | `/api/prs/:repo/:id/reviewers[/:id]` · `/workitems[/:id]` | Manage reviewers; link / unlink work items |
-| GET/POST | `/api/pipelines · /:id/runs · /:id/analytics · /overview · /:id/queue · /runs/:id/retry[-failed]` | Pipelines, runs, analytics, trigger & retry |
-| GET | `/api/workitems/assigned · /created · /team · /following · /sprint · /overview · /summary · /types` | Work-item lists (per tab, WIQL across the project union), rollups, type metadata |
-| GET | `/api/workitems/:id · /queries/:queryId/run · /queries/resolve?ref= · /export.csv?tab=` | Work-item detail; run a saved query; resolve a query from a link; CSV export |
-| POST/PATCH | `/api/workitems · /:id · /:id/comments · /:id/links[/remove]` | Create a work item; update fields/state/assignee/tags (json-patch + `rev` guard); comment; link / unlink |
+| POST/PATCH | `/api/prs/:repo/:id/threads[/inline\|/batch\|/:tid/comments]` · `/reviewers` · `/workitems` | Threads, reviewers, work-item links |
+| GET/POST | `/api/pipelines · /:id/runs · /:id/analytics · /overview · /:id/queue · /runs/:id/retry[-failed]` | Pipelines, runs, analytics, trigger, retry |
+| GET | `/api/workitems/assigned · /created · /team · /following · /sprint · /overview · /summary · /types` | Work-item lists, rollups, type metadata |
+| GET | `/api/workitems/:id · /queries/:queryId/run · /queries/resolve?ref= · /export.csv?tab=` | WI detail, run/resolve a saved query, CSV |
+| POST/PATCH | `/api/workitems · /:id · /:id/comments · /:id/links[/remove]` | Create/update (json-patch + `rev` guard), comment, link |
 | GET | `/api/stream` (SSE) · `/api/notifications` · POST `/poll · /read` · PUT `/preferences` | Live updates + notifications |
-| GET | `/api/export.csv?category=created\|assigned\|assignedTeam\|team` · `/api/pipelines/:id/export.csv` | CSV export |
-
-> **Security:** state-changing requests require an `X-Requested-With` header (CSRF
-> defense); baseline security headers (CSP, nosniff, frame-deny, HSTS-when-secure)
-> are set on every response; auth/token routes are **rate-limited**; sessions carry
-> a TTL and their `sid` is **rotated** on re-auth; CORS is restricted to
-> configured/localhost origins (no wildcard); and every `/api` request re-verifies
-> the caller's MDE Linux group membership.
+| GET | `/api/export.csv?category=… · /api/pipelines/:id/export.csv` | CSV export |
 
 ---
 
-## 🔐 Permissions & safety
-- Actions call the real Azure DevOps API, which enforces your permissions. If you
-  can't complete a PR or queue a build, the action returns a clear error — nothing
-  is bypassed.
-- **Merge** opens a confirmation dialog with strategy, delete-source-branch, and an
-  explicit policy-bypass opt-in. It never merges without your confirmation.
+## 🧪 Testing & quality
 
-## 📝 Notes
-- **Defaults**: every list view shows **Open** PRs **updated in the last 6 months**.
-  Drafts are hidden until you pick *Draft* (or *All states*); change the time window
-  with the *Updated:* dropdown.
-- The **Created** view fetches history automatically when you select *Merged*,
-  *Closed*, or *All states* (historical PRs are listed without the costly per-PR
-  enrichment).
-- **Assigned to Me** also surfaces PRs where a configured review group (TP Team,
-  eBPF Core, Installer Team) is a reviewer — each row is tagged with a 👥 badge.
-- Data is cached for ~45s; use **Refresh** to force-refetch.
-- **Live updates**: the notification bell subscribes to a Server-Sent Events
-  stream (`/api/stream`) and falls back to polling where `EventSource` is
-  unavailable.
-- Team-PR enrichment of large lists can take a few seconds on a cold load, then is
-  served from cache.
+```bash
+npm run lint     # ESLint over server/src + web/src
+npm test         # server/ and web/ node:test suites
+```
+Business logic lives in pure, dependency-free libraries (`server/src/lib/*`,
+`web/src/lib/*`) that are unit-tested with Node's built-in test runner — no test
+framework to install. Run a single suite with, e.g.,
+`node --test server/test/workItemQuery.test.js`.
+
+---
+
+## 🛡 Security
+
+- **Per-request identity:** each request executes in the signed-in user's
+  `AsyncLocalStorage` context and calls ADO with that user's token — the real API
+  enforces every permission; nothing is bypassed.
+- **CSRF:** state-changing requests must carry an `X-Requested-With` header (OWASP
+  custom-header pattern); browsers can't set it cross-origin without a CORS preflight.
+- **Headers:** CSP, `X-Content-Type-Options`, frame-deny, and HSTS-when-secure on
+  every response, including the served SPA.
+- **Rate limiting** on auth/token routes; **CORS** restricted to configured/localhost
+  origins (no wildcard).
+- **Sessions** carry a TTL and rotate their `sid` on re-auth; vault tokens are
+  encrypted at rest with **AES-256-GCM**.
+- **Access gate** re-checks MDE Linux group membership on every `/api` request.
+- **Rich text** from ADO is sanitized with DOMPurify before rendering.
+- **Merge** requires explicit confirmation (strategy, delete-source-branch, and an
+  opt-in policy bypass) — it never merges silently.
+
+---
+
+## 🩺 Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| *"Not signed in"* locally | Run `az login`, then reload. |
+| 401 *token expired* when hosted | Paste a fresh token (see [Authentication](#-authentication--access-control)) or run `scripts/token-pusher.sh`. |
+| 403 *not a member of …* | Your account isn't in the `ALLOWED_GROUP` (MDE Linux). |
+| `fetch failed` / connect timeout to ADO | IPv6 routing; the server already forces `ipv4first`. Check network/VPN and that the org URL is reachable. |
+| Logins reset after a deploy | Set `DATA_DIR` to persistent storage (e.g. `/home/data`) and a stable `TOKEN_ENC_KEY`. |
+| A project/repo/query won't add | Paste the **full URL**; it must belong to a monitored project/org. |
+| Build fails with an old Node | Use Node ≥ 20 (`node -v`). |
+
+---
+
+## 🤝 Contributing
+
+1. `npm run install:all`
+2. Make focused changes; keep business logic in the pure `lib/` modules and add a
+   `node:test` case beside it.
+3. `npm run lint && npm test && npm run build` must pass before you push.
+
+---
+
+## 📄 License
+
+Internal tooling — **not** licensed for external distribution. The Azure DevOps
+organizations, groups, and projects referenced here are Microsoft-internal. Add a
+`LICENSE` file before sharing this repository outside your organization.
