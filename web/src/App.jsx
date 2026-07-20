@@ -26,6 +26,7 @@ import { WorkItemDetail } from './pages/WorkItemDetail.jsx';
 import { CreateWorkItem } from './pages/CreateWorkItem.jsx';
 import { SearchPage } from './pages/SearchPage.jsx';
 import { Settings } from './pages/Settings.jsx';
+import { CopilotSessions } from './pages/CopilotSessions.jsx';
 
 export default function App() {
   const [phase, setPhase] = useState('loading'); // loading | login | ready | error
@@ -190,6 +191,7 @@ export default function App() {
               <Route path="pr/:repo/:id" element={<PrDetail />} />
               <Route path="work-item/:id" element={<WorkItemDetail />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="agents" element={<CopilotSessions />} />
               <Route path="*" element={<ProjectOverview />} />
             </Route>
           </Routes>

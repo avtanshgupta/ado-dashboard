@@ -137,4 +137,11 @@ export const api = {
   setPrefs: (prefs) => req('/notifications/preferences', { method: 'PUT', body: prefs }),
 
   exportUrl: (category, status) => `${BASE}/export.csv?category=${category}${status ? `&status=${status}` : ''}`,
+
+  // Agent sessions (Copilot CLI visibility)
+  agentSessions: () => req('/agents/sessions'),
+  agentSessionsGrouped: () => req('/agents/sessions/grouped'),
+  agentSummary: () => req('/agents/summary'),
+  agentEnd: (id) => req(`/agents/sessions/${id}`, { method: 'DELETE' }),
+  agentPrune: () => req('/agents/prune', { method: 'POST' }),
 };

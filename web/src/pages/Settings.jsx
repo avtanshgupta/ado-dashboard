@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useConfig, useApp } from '../lib/AppContext.jsx';
 import { useToast } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
-import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser } from '../components/icons.jsx';
+import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser, Bot } from '../components/icons.jsx';
 
 /**
  * Tag input that searches Azure DevOps users as you type (by alias or email) and
@@ -306,6 +306,7 @@ export function Settings() {
     { id: 'workitems', label: 'Work Items', Icon: ClipboardList },
     { id: 'notifications', label: 'Notifications', Icon: Bell },
     { id: 'templates', label: 'Comment templates', Icon: MessageSquare },
+    { id: 'agents', label: 'Agents', Icon: Bot },
     { id: 'account', label: 'Account', Icon: CircleUser },
   ];
 
@@ -574,6 +575,28 @@ export function Settings() {
                 </div>
               ))}
               <button className="btn sm accent" onClick={() => setTemplates([...templates, { id: `t${Date.now()}`, name: '', body: '' }])}>+ Add template</button>
+            </div>
+          )}
+
+          {section === 'agents' && (
+            <div className="card card-pad">
+              <h3 className="settings-section-head">Copilot Agent Sessions</h3>
+              <p className="muted" style={{ fontSize: 12.5, marginBottom: 16 }}>
+                Configure the reporter script that sends heartbeats from your VMs.
+              </p>
+              <div className="field-row">
+                <label className="field-label">Stale threshold (minutes)</label>
+                <input type="number" min={1} max={60} value={draft.agents?.staleMinutes || 5}
+                  onChange={(e) => setDraft((d) => ({ ...d, agents: { ...d.agents, staleMinutes: Number(e.target.value) } }))} />
+              </div>
+              <div className="field-row">
+                <label className="field-label">Long-running threshold (hours)</label>
+                <input type="number" min={1} max={48} value={draft.agents?.longRunningHours || 4}
+                  onChange={(e) => setDraft((d) => ({ ...d, agents: { ...d.agents, longRunningHours: Number(e.target.value) } }))} />
+              </div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 16 }}>
+                <strong>Reporter setup:</strong> Create <code>~/.config/ado-dashboard/reporter.json</code> on each VM with your dashboard URL and API credentials, then schedule <code>scripts/copilot-session-reporter.py</code> via cron.
+              </div>
             </div>
           )}
 
