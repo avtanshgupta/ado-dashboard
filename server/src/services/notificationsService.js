@@ -4,7 +4,6 @@ import { config } from '../config.js';
 import { currentUser, currentConfig } from '../lib/context.js';
 import { writeJsonAtomic } from '../lib/atomicFile.js';
 import { snapshotState } from './prService.js';
-import { postToChatWebhooks } from './chatService.js';
 
 const dataDir = join(config.dataDir, 'notif');
 
@@ -80,7 +79,6 @@ export async function poll() {
   const prefs = cfg.notificationPrefs;
   const mutedRepos = cfg.mutedRepoSet || new Set();
   const store = load(uid);
-  store.email = currentUser().uniqueName || store.email || null; // for digest delivery (C3)
   const current = await snapshotState();
   const currentMap = {};
   for (const pr of current) currentMap[key(pr)] = snapEntry(pr);
@@ -148,29 +146,5 @@ export async function poll() {
   store.items = [...kept, ...(store.items || [])].slice(0, 500);
   save(uid, store);
 
-  if (kept.length && prefs.email && config.email.enabled) {
-    sendEmail(kept, currentUser().uniqueName).catch((e) => console.error('[email] send failed:', e.message));
-  }
-  // D1 — fan out to configured chat webhooks (Slack/Teams).
-  if (kept.length && prefs.chat && (cfg.chatWebhooks || []).length) {
-    postToChatWebhooks(cfg.chatWebhooks, kept).catch((e) => console.error('[chat] webhook failed:', e.message));
-  }
   return { newItems: kept, unread: getNotifications().unread };
-}
-
-async function sendEmail(items, to) {
-  const nodemailer = (await import('nodemailer')).default;
-  const transport = nodemailer.createTransport({
-    host: config.email.host,
-    port: config.email.port,
-    secure: config.email.secure,
-    auth: config.email.user ? { user: config.email.user, pass: config.email.pass } : undefined,
-  });
-  const lines = items.map((i) => `\u2022 [${i.repo}] ${i.message}\n  ${i.webUrl}`).join('\n\n');
-  await transport.sendMail({
-    from: config.email.from,
-    to,
-    subject: `ADO PR Dashboard: ${items.length} update(s)`,
-    text: `You have ${items.length} new update(s):\n\n${lines}`,
-  });
 }
