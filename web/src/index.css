@@ -922,3 +922,49 @@ a.kv:hover { background: var(--surface-2); }
 .tour-count { font-size: 11.5px; color: var(--text-subtle); margin-right: 2px; }
 .tour-skip { display: block; width: 100%; margin-top: 9px; padding-top: 9px; border: none; border-top: 1px solid var(--border-muted); background: none; color: var(--text-subtle); font-size: 12px; cursor: pointer; }
 .tour-skip:hover { color: var(--text-muted); }
+
+/* === Copilot Agent Sessions === */
+.copilot-sessions-page .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.copilot-sessions-page .page-title { display: flex; align-items: center; gap: 10px; }
+.copilot-sessions-page .page-title h1 { font-size: 1.3rem; font-weight: 600; margin: 0; }
+
+.agent-summary-cards { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.agent-summary-cards .summary-card { display: flex; align-items: center; gap: 8px; padding: 12px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-width: 120px; }
+.agent-summary-cards .summary-card .count { font-size: 1.4rem; font-weight: 700; }
+.agent-summary-cards .summary-card .label { font-size: 0.8rem; color: var(--text-subtle); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.active, .summary-card.active .status-dot { background: #22c55e; }
+.status-dot.idle, .summary-card.idle .status-dot { background: #eab308; }
+.status-dot.stale, .summary-card.stale .status-dot { background: #ef4444; }
+.status-dot.ended, .summary-card.ended .status-dot { background: #6b7280; }
+
+.machine-group { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.machine-header { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: var(--surface-2); border: none; width: 100%; cursor: pointer; font-size: 0.9rem; font-weight: 600; text-align: left; }
+.machine-header .chevron { display: flex; color: var(--text-subtle); }
+.machine-header .machine-meta { margin-left: auto; font-weight: 400; font-size: 0.8rem; color: var(--text-subtle); display: flex; align-items: center; gap: 8px; }
+.machine-header .active-badge { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+.machine-sessions { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+
+.agent-session-card { padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.agent-session-card.status-stale { border-left: 3px solid #ef4444; }
+.agent-session-card.status-active { border-left: 3px solid #22c55e; }
+.agent-session-card.status-idle { border-left: 3px solid #eab308; }
+.session-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.session-header .session-id { font-weight: 600; font-size: 0.85rem; }
+.session-header .status-badge { padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; text-transform: capitalize; }
+.session-header .status-badge.active { background: #dcfce7; color: #166534; }
+.session-header .status-badge.idle { background: #fef9c3; color: #854d0e; }
+.session-header .status-badge.stale { background: #fee2e2; color: #991b1b; }
+.session-header .status-badge.ended { background: #f3f4f6; color: #4b5563; }
+.session-header .end-btn { margin-left: auto; opacity: 0.5; background: none; border: none; cursor: pointer; padding: 4px; border-radius: 4px; }
+.session-header .end-btn:hover { opacity: 1; color: #ef4444; background: #fee2e2; }
+.session-details { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.78rem; color: var(--text-subtle); }
+.session-details .detail { display: flex; align-items: center; gap: 4px; }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-subtle); }
+.empty-state h2 { margin: 12px 0 6px; color: var(--text); }
+.empty-state p { margin-bottom: 16px; }
+.empty-state details { text-align: left; max-width: 400px; margin: 0 auto; }
+.empty-state details summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+.empty-state details ol { padding-left: 20px; line-height: 1.8; }
+.empty-state code { background: var(--surface-2); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; }

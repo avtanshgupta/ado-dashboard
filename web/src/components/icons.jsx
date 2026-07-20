@@ -88,4 +88,8 @@ export {
   // onboarding tour
   Compass,
   Rocket,
+  // agents
+  Bot,
+  Server,
+  Terminal,
 } from 'lucide-react';
