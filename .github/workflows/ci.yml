@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm --prefix server install
+          npm --prefix web install
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test (server + web)
+        run: npm test
+
+      - name: Build web
+        run: npm run build
+
+      - name: Audit (fail on high+ in production deps)
+        run: |
+          npm --prefix server audit --audit-level=high
+          # web dev-server tooling (vite/esbuild) carries advisories fixable only
+          # by a breaking major bump (tracked separately); audit runtime deps only.
+          npm --prefix web audit --omit=dev --audit-level=high

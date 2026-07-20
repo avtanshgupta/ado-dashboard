@@ -1,0 +1,148 @@
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../lib/api.js';
+import {
+  Zap, LayoutDashboard, GitPullRequestArrow, Eye, UserCheck, Users,
+  Workflow, Settings, Search, Sun, LogOut, RefreshCw,
+} from './icons.jsx';
+
+/**
+ * ⌘K / Ctrl-K command palette: instant navigation + free-text search, fully
+ * keyboard-driven (↑/↓ to move, ↵ to run, Esc to close). Mounted once globally so
+ * it works from any page. Typing anything offers a "search PRs & pipelines" jump.
+ */
+export function CommandPalette({ onLogout, onCycleTheme }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [active, setActive] = useState(0);
+  const inputRef = useRef(null);
+  const listRef = useRef(null);
+
+  const baseCommands = useMemo(
+    () => [
+      { id: 'ac', label: 'Go to Action Center', hint: 'what needs you', Icon: Zap, run: () => navigate('/action-center') },
+      { id: 'overview', label: 'Go to Dashboard', hint: 'dashboard home', Icon: LayoutDashboard, run: () => navigate('/') },
+      { id: 'created', label: 'My Pull Requests', hint: 'PRs I authored', Icon: GitPullRequestArrow, run: () => navigate('/pull-requests/created') },
+      { id: 'assigned', label: 'Assigned to Me', hint: 'PRs to review', Icon: Eye, run: () => navigate('/pull-requests/assigned') },
+      { id: 'assignedTeam', label: 'Assigned to Team', hint: 'group review', Icon: UserCheck, run: () => navigate('/pull-requests/assigned-team') },
+      { id: 'team', label: 'Team Pull Requests', hint: 'authored by team', Icon: Users, run: () => navigate('/pull-requests/team') },
+      { id: 'pipelines', label: 'Go to Pipelines', hint: 'runs & analytics', Icon: Workflow, run: () => navigate('/pipelines') },
+      { id: 'settings', label: 'Go to Settings', hint: 'repos, team, prefs', Icon: Settings, run: () => navigate('/settings') },
+      { id: 'refresh', label: 'Refresh current data', hint: 'clear cache & reload', Icon: RefreshCw, run: async () => { try { await api.refresh(); } catch { /* ignore */ } window.location.reload(); } },
+      { id: 'theme', label: 'Toggle theme', hint: 'light / dark / system', Icon: Sun, run: () => onCycleTheme?.() },
+      { id: 'logout', label: 'Sign out', hint: 'end session', Icon: LogOut, run: () => onLogout?.() },
+    ],
+    [navigate, onCycleTheme, onLogout]
+  );
+
+  const commands = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return baseCommands;
+    const matched = baseCommands.filter(
+      (c) => c.label.toLowerCase().includes(term) || (c.hint || '').toLowerCase().includes(term)
+    );
+    const searchCmd = {
+      id: 'search',
+      label: `Search PRs & pipelines for “${q.trim()}”`,
+      Icon: Search,
+      run: () => navigate(`/pull-requests/search?q=${encodeURIComponent(q.trim())}`),
+    };
+    return [searchCmd, ...matched];
+  }, [q, baseCommands, navigate]);
+
+  useEffect(() => {
+    function onKey(e) {
+      const k = e.key?.toLowerCase();
+      if ((e.metaKey || e.ctrlKey) && k === 'k') {
+        e.preventDefault();
+        setOpen((o) => !o);
+      } else if (e.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      setQ('');
+      setActive(0);
+      const t = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [open]);
+
+  useEffect(() => setActive(0), [q]);
+
+  // Keep the highlighted item scrolled into view while arrowing through a long
+  // list (block:'nearest' scrolls only the list container, minimally).
+  useEffect(() => {
+    if (!open) return;
+    const el = listRef.current?.querySelector('.cmdk-item.active');
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [active, open]);
+
+  const run = useCallback((cmd) => {
+    if (!cmd) return;
+    setOpen(false);
+    cmd.run();
+  }, []);
+
+  if (!open) return null;
+
+  function onInputKey(e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActive((a) => Math.min(a + 1, commands.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActive((a) => Math.max(a - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      run(commands[active]);
+    }
+  }
+
+  return (
+    <div className="cmdk-backdrop" onClick={() => setOpen(false)} role="dialog" aria-modal="true" aria-label="Command palette">
+      <div className="cmdk" onClick={(e) => e.stopPropagation()}>
+        <div className="cmdk-input-row">
+          <Search size={16} aria-hidden="true" />
+          <input
+            ref={inputRef}
+            className="cmdk-input"
+            placeholder="Type a command or search…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={onInputKey}
+            aria-label="Command or search"
+          />
+        </div>
+        <div className="cmdk-list" ref={listRef}>
+          {commands.length === 0 && <div className="cmdk-empty muted">No matching commands</div>}
+          {commands.map((c, i) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`cmdk-item ${i === active ? 'active' : ''}`}
+              onMouseEnter={() => setActive(i)}
+              onClick={() => run(c)}
+            >
+              <span className="cmdk-item-icon"><c.Icon size={15} /></span>
+              <span className="cmdk-item-label">{c.label}</span>
+              {c.hint && <span className="cmdk-item-hint muted">{c.hint}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="cmdk-foot muted">
+          <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+          <span><kbd>↵</kbd> select</span>
+          <span><kbd>esc</kbd> close</span>
+        </div>
+      </div>
+    </div>
+  );
+}

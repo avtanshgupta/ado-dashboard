@@ -1,0 +1,13 @@
+{
+  "name": "Azure DevOps PR Dashboard",
+  "short_name": "PR Dashboard",
+  "description": "Manage Azure DevOps pull requests and pipelines across your repositories.",
+  "icons": [
+    { "src": "/favicon.svg?v=3", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "/icon.svg?v=3", "type": "image/svg+xml", "sizes": "any", "purpose": "maskable" }
+  ],
+  "theme_color": "#0969da",
+  "background_color": "#0d1117",
+  "display": "standalone",
+  "start_url": "/"
+}

@@ -1,0 +1,22 @@
+{
+  "name": "ado-pr-dashboard-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Backend for the Azure DevOps PR management dashboard",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "diff": "^7.0.0",
+    "express": "^4.19.2",
+    "nodemailer": "^9.0.3"
+  }
+}

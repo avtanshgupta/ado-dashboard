@@ -1,0 +1,23 @@
+{
+  "name": "ado-pr-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dashboard to manage Azure DevOps pull requests across the WD.Client repositories",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix web install",
+    "dev": "node dev.mjs",
+    "build": "npm --prefix web run build",
+    "start": "npm --prefix server start",
+    "test": "npm --prefix server test && npm --prefix web test",
+    "lint": "eslint server/src web/src"
+  },
+  "devDependencies": {
+    "eslint": "^9.13.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5.0.0"
+  }
+}

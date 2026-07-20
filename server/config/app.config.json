@@ -1,0 +1,19 @@
+{
+  "organizationUrl": "https://microsoft.visualstudio.com",
+  "project": "Windows Defender",
+  "projectId": "22c8b9b6-7c86-4516-8af1-f55966ddb094",
+  "adoResourceId": "499b84ac-1321-427f-aa17-267ca6975798",
+  "repositories": [
+    "WD.Client.Linux"
+  ],
+  "team": [],
+  "reviewerGroups": [],
+  "defaultTimeRangeMonths": 6,
+  "pipelines": [
+    { "repo": "WD.Client.Linux", "definitionId": 137667, "name": "WD.Client.Linux (CI Gate)" },
+    { "repo": "WD.Client.Linux", "definitionId": 137913, "name": "WD.Client.Linux (CI-nightly Gate)" },
+    { "repo": "WD.Client.Linux", "definitionId": 137886, "name": "WD.Client.Linux (CD Gate)" }
+  ],
+  "cacheTtlSeconds": 45,
+  "fetchConcurrency": 16
+}
