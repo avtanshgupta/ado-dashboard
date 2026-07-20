@@ -9,7 +9,6 @@ import authRouter from './routes/auth.js';
 import { sessionContext, warmIdentity } from './middleware/sessionContext.js';
 import { csrfGuard } from './middleware/csrf.js';
 import { securityHeaders } from './middleware/securityHeaders.js';
-import { startDigestScheduler } from './services/digestService.js';
 
 // Prefer IPv4 in DNS resolution — some networks (incl. local dev machines) time
 // out on IPv6 routes to dev.azure.com/*.visualstudio.com, which surfaces as
@@ -72,8 +71,6 @@ app.listen(config.port, () => {
   console.log(`\n  ADO PR Dashboard (multi-user) on http://localhost:${config.port}`);
   if (existsSync(webDist)) console.log('  Serving UI from web/dist');
   console.log('');
-  // C3 — scheduled digest emails (no-op unless SMTP is configured).
-  startDigestScheduler();
   // Only probe the local `az` CLI when the local fallback is actually enabled;
   // hosted deployments (DISABLE_AZ_FALLBACK=true) never use it.
   if (config.disableAzFallback) {

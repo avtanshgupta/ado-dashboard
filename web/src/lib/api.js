@@ -43,6 +43,7 @@ export const api = {
   updateConfig: (patch) => req('/config', { method: 'PUT', body: patch }),
   projects: () => req('/projects'),
   repoResolve: (ref) => req(`/repos/resolve?ref=${encodeURIComponent(ref)}`),
+  projectResolve: (ref) => req(`/projects/resolve?ref=${encodeURIComponent(ref)}`),
   resolveGroup: (alias) => req('/resolve-group', { method: 'POST', body: { alias } }),
 
   // data
@@ -52,7 +53,6 @@ export const api = {
   prAnalytics: (months) => req(`/pr-analytics${months ? `?months=${months}` : ''}`),
   standup: (sinceHours) => req(`/standup${sinceHours ? `?sinceHours=${sinceHours}` : ''}`),
   standupIcsUrl: (sinceHours) => `${BASE}/standup.ics${sinceHours ? `?sinceHours=${sinceHours}` : ''}`,
-  testWebhook: (url, type) => req('/webhooks/test', { method: 'POST', body: { url, type } }),
 
   // personal overlay: follow / snooze / dismiss (E3)
   userState: () => req('/user-state'),
@@ -70,6 +70,22 @@ export const api = {
   createPr: (body) => req('/prs', { method: 'POST', body }),
   linkWorkItem: (repo, id, workItemId) => req(`/prs/${encodeURIComponent(repo)}/${id}/workitems`, { method: 'POST', body: { workItemId } }),
   unlinkWorkItem: (repo, id, witId) => req(`/prs/${encodeURIComponent(repo)}/${id}/workitems/${witId}`, { method: 'DELETE' }),
+
+  // work items (WI)
+  wiList: (tab) => req(`/workitems/${tab}`),
+  wiSprint: (scope) => req(`/workitems/sprint${scope ? `?scope=${scope}` : ''}`),
+  wiOverview: () => req('/workitems/overview'),
+  wiSummary: () => req('/workitems/summary'),
+  wiTypes: () => req('/workitems/types'),
+  wiRunQuery: (queryId) => req(`/workitems/queries/${encodeURIComponent(queryId)}/run`),
+  wiResolveQuery: (ref) => req(`/workitems/queries/resolve?ref=${encodeURIComponent(ref)}`),
+  wiDetail: (id) => req(`/workitems/${id}`),
+  wiCreate: (body) => req('/workitems', { method: 'POST', body }),
+  wiUpdate: (id, fields, rev) => req(`/workitems/${id}`, { method: 'PATCH', body: { fields, rev } }),
+  wiAddComment: (id, text) => req(`/workitems/${id}/comments`, { method: 'POST', body: { text } }),
+  wiAddLink: (id, targetId, rel) => req(`/workitems/${id}/links`, { method: 'POST', body: { targetId, rel } }),
+  wiRemoveLink: (id, body) => req(`/workitems/${id}/links/remove`, { method: 'POST', body }),
+  wiExportUrl: (tab) => `${BASE}/workitems/export.csv?tab=${encodeURIComponent(tab)}`,
 
   // actions
   merge: (repo, id, options) => req(`/prs/${encodeURIComponent(repo)}/${id}/merge`, { method: 'POST', body: options }),

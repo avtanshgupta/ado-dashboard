@@ -19,10 +19,9 @@ import { mergePr, publishPr, setAutoComplete, requeuePipeline, setVote, addRevie
 import { poll, getNotifications, markRead } from '../services/notificationsService.js';
 import { sseHandler } from '../services/streamService.js';
 import { standupMarkdown, standupIcs } from '../lib/standup.js';
-import { testWebhook } from '../services/chatService.js';
 import { getState, addFollow, removeFollow, setSnooze, clearSnooze, setDismiss, clearDismiss } from '../lib/userState.js';
 import { resolveGroup, searchIdentities } from '../services/identityService.js';
-import { resolveRepoLink } from '../services/projectService.js';
+import { resolveRepoLink, resolveProjectLink } from '../services/projectService.js';
 import { getPrDiffFiles, getPrFileDiff } from '../services/diffService.js';
 import {
   listDefinitions,
@@ -37,6 +36,24 @@ import {
   retryFailedStages,
   pipelineAnalytics,
 } from '../services/pipelineService.js';
+import {
+  listAssigned as wiListAssigned,
+  listCreated as wiListCreated,
+  listTeam as wiListTeam,
+  listFollowing as wiListFollowing,
+  listSprint as wiListSprint,
+  runSavedQuery as wiRunSavedQuery,
+  resolveSavedQuery as wiResolveSavedQuery,
+  getWorkItemsOverview,
+  getWorkItemsSummary,
+  getWorkItemDetail,
+  getWorkItemTypes,
+  createWorkItem,
+  updateWorkItem,
+  addWorkItemComment,
+  addWorkItemLink,
+  removeWorkItemRelation,
+} from '../services/workItemService.js';
 
 const router = Router();
 
@@ -52,6 +69,7 @@ function buildConfigResponse(cfg) {
     me: cfg.me,
     organizationUrl: cfg.organizationUrl,
     project: cfg.project,
+    projects: cfg.projects,
     repositories: cfg.repositories,
     repoProjects: cfg.repoProjects,
     team: cfg.team,
@@ -61,11 +79,11 @@ function buildConfigResponse(cfg) {
     notificationPrefs: cfg.notificationPrefs,
     commentTemplates: cfg.commentTemplates,
     savedViews: cfg.savedViews,
-    chatWebhooks: cfg.chatWebhooks,
     mutedRepos: cfg.mutedRepos,
     uiPrefs: cfg.uiPrefs,
     slaDays: cfg.slaDays,
-    emailEnabled: config.email.enabled,
+    workItemSavedQueries: cfg.workItemSavedQueries,
+    workItemProjects: cfg.workItemProjects,
     defaults: config.defaults,
   };
 }
@@ -75,6 +93,10 @@ router.get('/config', wrap(async (_req, res) => res.json(buildConfigResponse(cur
 // Resolve a repo URL (or plain name) → verified { repo, project, projectId, … }
 // so a user can add a repo by pasting its link and start tracking it.
 router.get('/repos/resolve', wrap(async (req, res) => res.json(await resolveRepoLink(req.query.ref))));
+
+// Resolve a project URL (or name) → verified { name, id, url } so a user can
+// add a monitored project by pasting its link.
+router.get('/projects/resolve', wrap(async (req, res) => res.json(await resolveProjectLink(req.query.ref))));
 
 router.put(
   '/config',
@@ -128,14 +150,6 @@ router.get('/standup.ics', wrap(async (req, res) => {
   res.setHeader('Content-Type', 'text/calendar');
   res.setHeader('Content-Disposition', `attachment; filename="pr-standup-${new Date().toISOString().slice(0, 10)}.ics"`);
   res.send(standupIcs(s));
-}));
-
-// ---- chat webhook test (D1) ----
-router.post('/webhooks/test', wrap(async (req, res) => {
-  const { url, type } = req.body || {};
-  if (!url || !/^https:\/\//i.test(url)) { const e = new Error('An https webhook URL is required.'); e.status = 400; throw e; }
-  await testWebhook({ url, type });
-  res.json({ ok: true });
 }));
 
 router.get('/prs/created', wrap(async (req, res) => res.json(await listCreated({ status: req.query.status }))));
@@ -283,6 +297,64 @@ router.post('/prs/:repo/:id/workitems', wrap(async (req, res) => {
 router.delete('/prs/:repo/:id/workitems/:witId', wrap(async (req, res) =>
   res.json(await unlinkWorkItem(req.params.repo, req.params.id, req.params.witId))
 ));
+
+// ---- work items ----
+const WI_TABS = {
+  assigned: wiListAssigned,
+  created: wiListCreated,
+  team: wiListTeam,
+  following: wiListFollowing,
+};
+router.get('/workitems/assigned', wrap(async (_req, res) => res.json(await wiListAssigned())));
+router.get('/workitems/created', wrap(async (_req, res) => res.json(await wiListCreated())));
+router.get('/workitems/team', wrap(async (_req, res) => res.json(await wiListTeam())));
+router.get('/workitems/following', wrap(async (_req, res) => res.json(await wiListFollowing())));
+router.get('/workitems/sprint', wrap(async (req, res) => res.json(await wiListSprint({ scope: req.query.scope }))));
+router.get('/workitems/overview', wrap(async (_req, res) => res.json(await getWorkItemsOverview())));
+router.get('/workitems/summary', wrap(async (_req, res) => res.json(await getWorkItemsSummary())));
+router.get('/workitems/types', wrap(async (_req, res) => res.json(await getWorkItemTypes())));
+router.get('/workitems/queries/:queryId/run', wrap(async (req, res) => res.json(await wiRunSavedQuery(req.params.queryId))));
+router.get('/workitems/queries/resolve', wrap(async (req, res) => res.json(await wiResolveSavedQuery(req.query.ref))));
+
+// Work item CSV export (per tab).
+router.get('/workitems/export.csv', wrap(async (req, res) => {
+  const tab = WI_TABS[req.query.tab] ? req.query.tab : 'assigned';
+  const items = await WI_TABS[tab]();
+  const cols = ['id', 'type', 'title', 'state', 'assignedTo', 'createdBy', 'priority', 'severity', 'storyPoints', 'areaPath', 'iterationPath', 'tags', 'project', 'createdDate', 'changedDate', 'url'];
+  const esc = (v) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const rows = items.map((w) => [w.id, w.type, w.title, w.state, w.assignedTo?.displayName ?? '', w.createdBy?.displayName ?? '', w.priority ?? '', w.severity ?? '', w.storyPoints ?? '', w.areaPath ?? '', w.iterationPath ?? '', (w.tags || []).join('; '), w.project ?? '', w.createdDate ?? '', w.changedDate ?? '', w.url ?? ''].map(esc).join(','));
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="ado-workitems-${tab}-${new Date().toISOString().slice(0, 10)}.csv"`);
+  res.send([cols.join(','), ...rows].join('\n'));
+}));
+
+// Create a work item.
+router.post('/workitems', wrap(async (req, res) => {
+  const { project, type, fields } = req.body || {};
+  res.json(await createWorkItem(project, type, fields));
+}));
+
+// Detail (numeric id only, so it doesn't shadow the named routes above).
+router.get('/workitems/:id(\\d+)', wrap(async (req, res) => res.json(await getWorkItemDetail(req.params.id))));
+
+// Update fields / state / assignee / tags (json-patch built server-side).
+router.patch('/workitems/:id(\\d+)', wrap(async (req, res) => {
+  const { fields, rev } = req.body || {};
+  res.json(await updateWorkItem(req.params.id, fields, { rev }));
+}));
+
+// Discussion comment.
+router.post('/workitems/:id(\\d+)/comments', wrap(async (req, res) => res.json(await addWorkItemComment(req.params.id, (req.body || {}).text))));
+
+// Link / unlink related work items.
+router.post('/workitems/:id(\\d+)/links', wrap(async (req, res) => {
+  const { targetId, rel } = req.body || {};
+  res.json(await addWorkItemLink(req.params.id, targetId, rel));
+}));
+router.post('/workitems/:id(\\d+)/links/remove', wrap(async (req, res) => {
+  const { relationUrl, targetId } = req.body || {};
+  res.json(await removeWorkItemRelation(req.params.id, { relationUrl, targetId }));
+}));
 
 // ---- pipelines ----
 router.get('/pipelines', wrap(async (req, res) => res.json(await listDefinitions({ withLatest: req.query.latest !== 'false' }))));
