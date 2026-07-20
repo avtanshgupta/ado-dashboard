@@ -922,3 +922,72 @@ a.kv:hover { background: var(--surface-2); }
 .tour-count { font-size: 11.5px; color: var(--text-subtle); margin-right: 2px; }
 .tour-skip { display: block; width: 100%; margin-top: 9px; padding-top: 9px; border: none; border-top: 1px solid var(--border-muted); background: none; color: var(--text-subtle); font-size: 12px; cursor: pointer; }
 .tour-skip:hover { color: var(--text-muted); }
+
+/* ===== Planning Page ===== */
+.planning-page .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+.planning-page .page-header h1 { margin: 0; }
+.planning-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width: 900px) { .planning-grid { grid-template-columns: 1fr; } }
+.planning-section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+.planning-section .section-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.planning-section .section-header h2 { font-size: 1rem; margin: 0; display: flex; align-items: center; gap: 0.4rem; }
+.subsection-title { font-size: 0.85rem; margin: 1rem 0 0.5rem; display: flex; align-items: center; gap: 0.35rem; color: var(--text-muted); }
+.quick-add { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.quick-add input { flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; background: var(--input-bg, var(--bg)); font-size: 0.875rem; }
+
+/* Task Card */
+.task-card { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border-muted); border-radius: 6px; margin-bottom: 0.4rem; transition: background 0.15s; }
+.task-card:hover { background: var(--hover-bg, rgba(0,0,0,0.02)); }
+.task-card.status-done { opacity: 0.6; }
+.task-status-btn { background: none; border: none; cursor: pointer; padding: 2px; }
+.task-content { flex: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.task-title { font-size: 0.875rem; }
+.task-title.done { text-decoration: line-through; color: var(--text-muted); }
+.task-edit-input { flex: 1; padding: 0.25rem 0.5rem; border: 1px solid var(--accent); border-radius: 4px; font-size: 0.875rem; background: var(--input-bg, var(--bg)); }
+.task-actions { display: flex; gap: 0.25rem; opacity: 0; transition: opacity 0.15s; }
+.task-card:hover .task-actions { opacity: 1; }
+.task-badge { font-size: 11px; padding: 1px 5px; border-radius: 4px; }
+.task-badge.carried { background: var(--warning-bg, #fef3c7); color: var(--warning, #92400e); }
+
+/* Task Status Badge */
+.task-status-badge { font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+.badge-planned { background: var(--badge-neutral-bg, #e5e7eb); color: var(--badge-neutral, #374151); }
+.badge-in-progress { background: var(--badge-blue-bg, #dbeafe); color: var(--badge-blue, #1d4ed8); }
+.badge-blocked { background: var(--badge-red-bg, #fee2e2); color: var(--badge-red, #991b1b); }
+.badge-done { background: var(--badge-green-bg, #d1fae5); color: var(--badge-green, #065f46); }
+
+/* Weekly Goal Card */
+.weekly-goal-card { border: 1px solid var(--border-muted); border-radius: 6px; margin-bottom: 0.5rem; overflow: hidden; }
+.weekly-goal-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; }
+.expand-btn { background: none; border: none; cursor: pointer; padding: 2px; color: var(--text-muted); }
+.goal-title { flex: 1; font-size: 0.875rem; font-weight: 500; }
+.goal-title.done { text-decoration: line-through; color: var(--text-muted); }
+.goal-due { font-size: 12px; }
+.weekly-goal-details { padding: 0.5rem 0.75rem 0.75rem 2.5rem; border-top: 1px solid var(--border-muted); }
+.goal-description { font-size: 0.8rem; color: var(--text-muted); margin: 0; }
+
+/* Plan Summary Cards */
+.plan-summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+@media (max-width: 768px) { .plan-summary-cards { grid-template-columns: repeat(2, 1fr); } }
+.summary-card { display: flex; align-items: center; gap: 0.75rem; padding: 1rem; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; }
+.summary-card-icon { flex-shrink: 0; }
+.summary-card-body { display: flex; flex-direction: column; }
+.summary-card-value { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+.summary-card-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+
+/* AI Planning Panel */
+.ai-planning-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-top: 1.5rem; }
+.ai-planning-panel .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.ai-planning-panel .section-header h2 { font-size: 1rem; margin: 0; display: flex; align-items: center; gap: 0.4rem; }
+.ai-input-form { display: flex; gap: 0.75rem; align-items: flex-end; }
+.ai-input { flex: 1; padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; background: var(--input-bg, var(--bg)); font-size: 0.875rem; resize: vertical; font-family: inherit; }
+.ai-error { color: var(--red, #dc2626); font-size: 0.8rem; margin-top: 0.5rem; }
+.ai-suggestions { margin-top: 1rem; border: 1px solid var(--border-muted); border-radius: 6px; overflow: hidden; }
+.ai-suggestions-header { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; background: var(--hover-bg, rgba(0,0,0,0.02)); border-bottom: 1px solid var(--border-muted); font-size: 0.8rem; }
+.ai-suggestion-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-muted); }
+.ai-suggestion-item:last-child { border-bottom: none; }
+.ai-suggestion-info { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; }
+.ai-suggestion-title { font-size: 0.875rem; }
+.ai-type-badge { font-size: 10px; padding: 1px 6px; border-radius: 3px; text-transform: uppercase; font-weight: 600; }
+.ai-type-badge.daily { background: var(--badge-blue-bg, #dbeafe); color: var(--badge-blue, #1d4ed8); }
+.ai-type-badge.weekly { background: var(--badge-purple-bg, #ede9fe); color: var(--badge-purple, #5b21b6); }

@@ -26,6 +26,7 @@ import { WorkItemDetail } from './pages/WorkItemDetail.jsx';
 import { CreateWorkItem } from './pages/CreateWorkItem.jsx';
 import { SearchPage } from './pages/SearchPage.jsx';
 import { Settings } from './pages/Settings.jsx';
+import { Planning } from './pages/Planning.jsx';
 
 export default function App() {
   const [phase, setPhase] = useState('loading'); // loading | login | ready | error
@@ -161,6 +162,7 @@ export default function App() {
           <Routes>
             <Route element={<Layout />}>
               <Route index element={<ProjectOverview />} />
+              <Route path="planning" element={<Planning />} />
               <Route path="action-center" element={<ActionCenter />} />
               <Route path="pull-requests" element={<PullRequests />}>
                 <Route index element={<Overview />} />

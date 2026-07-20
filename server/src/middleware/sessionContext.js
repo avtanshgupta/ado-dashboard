@@ -2,10 +2,10 @@ import { config } from '../config.js';
 import { runWithCtx } from '../lib/context.js';
 import { effectiveConfig } from '../lib/userConfig.js';
 import { readCookie } from '../lib/cookies.js';
-import { getSession, getVaultToken } from '../lib/sessions.js';
+import { getSession, getVaultToken, getGraphToken } from '../lib/sessions.js';
 import { resolveIdentityFromAuth } from '../lib/identity.js';
 import { isAllowed } from '../lib/access.js';
-import { getAzToken } from '../lib/tokenManager.js';
+import { getAzToken, getAzGraphToken } from '../lib/tokenManager.js';
 
 const COOKIE = config.cookieName;
 
@@ -60,7 +60,7 @@ export async function sessionContext(req, res, next) {
       return unauth(res, 403, 'forbidden', `${user.uniqueName || user.displayName} isn't a member of ${config.allowedGroupAlias}.`);
     }
 
-    runWithCtx({ authHeader, user, userConfig: effectiveConfig(user) }, () => next());
+    runWithCtx({ authHeader, user, userConfig: effectiveConfig(user), graphToken: await resolveGraphToken(session, user) }, () => next());
   } catch (err) {
     const status = err.status || 500;
     if (status === 401) return unauth(res, 401, 'token_expired', err.message || 'Your Azure access token expired. Paste a fresh one to continue.');
@@ -71,4 +71,26 @@ export async function sessionContext(req, res, next) {
 /** Eagerly resolve the local `az` identity at startup (best-effort). */
 export async function warmIdentity() {
   return resolveAzUser();
+}
+
+/**
+ * Best-effort Graph token resolution for Microsoft To Do integration.
+ * Returns the token string if available, null otherwise (planning features
+ * will show a "Connect To Do" prompt). Never blocks authentication.
+ */
+async function resolveGraphToken(session, user) {
+  try {
+    if (session) {
+      const gt = getGraphToken(session.userId);
+      if (gt && gt.expiresAt > Date.now()) return gt.token;
+      return null;
+    }
+    // Local dev: try `az account get-access-token --resource https://graph.microsoft.com`
+    if (!config.disableAzFallback) {
+      return await getAzGraphToken();
+    }
+  } catch {
+    // Graph token is optional — planning features degrade gracefully.
+  }
+  return null;
 }

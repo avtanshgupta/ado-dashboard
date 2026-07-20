@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-// Per-request context: { authHeader, user, userConfig }
+// Per-request context: { authHeader, user, userConfig, graphToken }
 export const als = new AsyncLocalStorage();
 
 export function getCtx() {
@@ -24,4 +24,9 @@ export function currentConfig() {
 /** The Authorization header to use for ADO calls in the current request. */
 export function currentAuthHeader() {
   return getCtx()?.authHeader || null;
+}
+
+/** The Microsoft Graph bearer token for the current request (To Do, Planner). */
+export function currentGraphToken() {
+  return getCtx()?.graphToken || null;
 }

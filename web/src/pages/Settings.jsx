@@ -116,6 +116,90 @@ function orgLabel(url) {
   }
 }
 
+function PlanningSettingsSection() {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+
+  useEffect(() => {
+    api.planningSettings().then((s) => { setSettings(s); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const result = await api.updatePlanningSettings(settings);
+      setSettings(result);
+      toast('Planning settings saved');
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="card card-pad"><p className="muted">Loading planning settings…</p></div>;
+  if (!settings) return <div className="card card-pad"><p className="muted">Connect Microsoft To Do to configure planning.</p></div>;
+
+  return (
+    <div className="card card-pad">
+      <h3 className="settings-section-head">Planning Mode</h3>
+      <div className="muted" style={{ fontSize: 12, marginBottom: 12 }}>Choose how you want to organize your personal planning.</div>
+      <select
+        value={settings.planningMode}
+        onChange={(e) => setSettings({ ...settings, planningMode: e.target.value })}
+        style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', marginBottom: 16 }}
+      >
+        <option value="daily_weekly">Daily + Weekly (Recommended)</option>
+        <option value="daily_only">Daily Only</option>
+        <option value="weekly_only">Weekly Only</option>
+      </select>
+
+      <h3 className="settings-section-head">Defaults</h3>
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: 16 }}>
+        <label style={{ fontSize: 13 }}>
+          Daily due time:
+          <input
+            type="time"
+            value={settings.defaultDailyDueTime}
+            onChange={(e) => setSettings({ ...settings, defaultDailyDueTime: e.target.value })}
+            style={{ marginLeft: 8, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)' }}
+          />
+        </label>
+        <label style={{ fontSize: 13 }}>
+          Weekly due day:
+          <select
+            value={settings.defaultWeeklyDueDay}
+            onChange={(e) => setSettings({ ...settings, defaultWeeklyDueDay: e.target.value })}
+            style={{ marginLeft: 8, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)' }}
+          >
+            {['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].map((d) => (
+              <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <h3 className="settings-section-head">AI Assistant</h3>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+        <input
+          type="checkbox"
+          checked={settings.aiAssistantEnabled}
+          onChange={(e) => setSettings({ ...settings, aiAssistantEnabled: e.target.checked })}
+        />
+        Enable AI Planning Assistant (GitHub Copilot)
+      </label>
+
+      <div style={{ marginTop: 20 }}>
+        <button className="btn primary small" onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Save Planning Settings'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function Settings() {
   const config = useConfig();
   const { reloadConfig } = useApp();
@@ -304,6 +388,7 @@ export function Settings() {
     { id: 'team', label: 'Team & Reviewers', Icon: Users },
     { id: 'pipelines', label: 'Pipelines', Icon: Workflow },
     { id: 'workitems', label: 'Work Items', Icon: ClipboardList },
+    { id: 'planning', label: 'Planning', Icon: SlidersHorizontal },
     { id: 'notifications', label: 'Notifications', Icon: Bell },
     { id: 'templates', label: 'Comment templates', Icon: MessageSquare },
     { id: 'account', label: 'Account', Icon: CircleUser },
@@ -577,6 +662,9 @@ export function Settings() {
             </div>
           )}
 
+          {section === 'planning' && (
+            <PlanningSettingsSection />
+          )}
           {section === 'account' && (
             <div className="card card-pad">
               <h3 className="settings-section-head">Account</h3>
