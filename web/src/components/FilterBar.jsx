@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
 import { STATE_OPTIONS, SORT_OPTIONS, TIME_RANGES } from '../lib/filters.js';
 import { api } from '../lib/api.js';
+import { MultiSelect } from './MultiSelect.jsx';
+import { RefreshingTag } from './ui.jsx';
 import { Tag, ArrowUp, ArrowDown, RefreshCw, Download, Printer } from './icons.jsx';
 
 export function FilterBar({
@@ -17,50 +18,14 @@ export function FilterBar({
   showStateFilter = true,
   labels = [],
   extra = null,
+  revalidating = false,
 }) {
-  function toggleRepo(repo) {
+  const toggle = (key) => (val) =>
     setFilters((f) => {
-      const has = f.repos.includes(repo);
-      return { ...f, repos: has ? f.repos.filter((r) => r !== repo) : [...f.repos, repo] };
+      const cur = f[key] || [];
+      return { ...f, [key]: cur.includes(val) ? cur.filter((x) => x !== val) : [...cur, val] };
     });
-  }
-
-  function toggleLabel(label) {
-    setFilters((f) => {
-      const cur = f.labels || [];
-      const has = cur.includes(label);
-      return { ...f, labels: has ? cur.filter((l) => l !== label) : [...cur, label] };
-    });
-  }
-
-  const [repoMenuOpen, setRepoMenuOpen] = useState(false);
-  const repoMenuRef = useRef(null);
-  const [labelMenuOpen, setLabelMenuOpen] = useState(false);
-  const labelMenuRef = useRef(null);
-
-  useEffect(() => {
-    function onClick(e) {
-      if (repoMenuRef.current && !repoMenuRef.current.contains(e.target)) setRepoMenuOpen(false);
-      if (labelMenuRef.current && !labelMenuRef.current.contains(e.target)) setLabelMenuOpen(false);
-    }
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
-
-  const repoLabel =
-    filters.repos.length === 0
-      ? 'All repositories'
-      : filters.repos.length === 1
-        ? filters.repos[0]
-        : `${filters.repos.length} repositories`;
-
-  const selectedLabels = filters.labels || [];
-  const labelButtonText =
-    selectedLabels.length === 0
-      ? 'All labels'
-      : selectedLabels.length === 1
-        ? selectedLabels[0]
-        : `${selectedLabels.length} labels`;
+  const clear = (key) => () => setFilters((f) => ({ ...f, [key]: [] }));
 
   return (
     <div className="filter-bar no-print">
@@ -73,97 +38,37 @@ export function FilterBar({
         />
       </div>
 
-      <div className="dropdown" ref={repoMenuRef}>
-        <button
-          type="button"
-          className="dropdown-toggle"
-          onClick={() => setRepoMenuOpen((o) => !o)}
-          title="Filter by repository"
-        >
-          {repoLabel}
-        </button>
-        {repoMenuOpen && (
-          <div className="dropdown-menu" style={{ minWidth: 260 }}>
-            <div className="dd-head">
-              <span>Repositories</span>
-              {filters.repos.length > 0 && (
-                <button
-                  type="button"
-                  className="btn sm"
-                  onClick={() => setFilters((f) => ({ ...f, repos: [] }))}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {repositories.map((repo) => (
-              <label key={repo} className="dd-item" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={filters.repos.includes(repo)}
-                  onChange={() => toggleRepo(repo)}
-                />
-                {repo}
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
+      <MultiSelect
+        label="Repositories"
+        allLabel="All repositories"
+        options={repositories}
+        selected={filters.repos}
+        onToggle={toggle('repos')}
+        onClear={clear('repos')}
+        minWidth={260}
+      />
 
       {labels.length > 0 && (
-        <div className="dropdown" ref={labelMenuRef}>
-          <button
-            type="button"
-            className="dropdown-toggle"
-            onClick={() => setLabelMenuOpen((o) => !o)}
-            title="Filter by label"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-          >
-            <Tag size={14} /> {labelButtonText}
-          </button>
-          {labelMenuOpen && (
-            <div className="dropdown-menu" style={{ minWidth: 220, maxHeight: 320, overflowY: 'auto' }}>
-              <div className="dd-head">
-                <span>Labels</span>
-                {selectedLabels.length > 0 && (
-                  <button
-                    type="button"
-                    className="btn sm"
-                    onClick={() => setFilters((f) => ({ ...f, labels: [] }))}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              {labels.map((label) => (
-                <label key={label} className="dd-item" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedLabels.includes(label)}
-                    onChange={() => toggleLabel(label)}
-                  />
-                  {label}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
+        <MultiSelect
+          label="Labels"
+          options={labels}
+          selected={filters.labels || []}
+          onToggle={toggle('labels')}
+          onClear={clear('labels')}
+          icon={Tag}
+        />
       )}
 
       {showStateFilter && (
-        <select
-          value={filters.states[0] || ''}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, states: e.target.value ? [e.target.value] : [] }))
-          }
-        >
-          <option value="">All states</option>
-          {STATE_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        <MultiSelect
+          label="States"
+          allLabel="All states"
+          options={STATE_OPTIONS}
+          selected={filters.states}
+          onToggle={toggle('states')}
+          onClear={clear('states')}
+          minWidth={160}
+        />
       )}
 
       <select
@@ -196,6 +101,7 @@ export function FilterBar({
       {extra}
 
       <div className="grow" />
+      <RefreshingTag show={revalidating} />
       <span className="result-count">
         {shown} of {total}
       </span>
