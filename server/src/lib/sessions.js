@@ -12,9 +12,8 @@ import { encryptSecret, decryptSecret, isEncrypted } from './crypto.js';
  *  - sessions: sid    -> { userId, user, createdAt, lastSeen }
  *
  * A browser holds an opaque `sid` cookie; the actual short-lived Azure token
- * lives in the vault keyed by userId. Either a browser re-paste or the local
- * token-pusher helper refreshes the vault, and every session for that user
- * immediately benefits — so the browser rarely needs to paste again.
+ * lives in the vault keyed by userId. A browser re-paste refreshes the vault,
+ * and every session for that user immediately benefits.
  *
  * Tokens are encrypted at rest (AES-256-GCM) so a leaked `auth.json` does not
  * expose usable Azure credentials. Sessions carry an absolute + idle TTL and are

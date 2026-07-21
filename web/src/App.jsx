@@ -92,8 +92,8 @@ export default function App() {
     return () => window.removeEventListener('ado-auth-expired', onExpired);
   }, []);
 
-  // While the re-paste banner is up, auto-recover if a fresh token arrives
-  // (e.g. the token-pusher helper refreshed the vault) — no manual paste needed.
+  // While the re-paste banner is up, auto-recover if a fresh token arrives for
+  // this user (e.g. another tab or device re-authenticated) — no manual paste needed.
   useEffect(() => {
     if (!expired) return undefined;
     let stopped = false;

@@ -9,8 +9,8 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * can't forge an authenticated merge/vote/requeue using the session cookie.
  * (Combined with the session cookie's sameSite=lax, this is defense-in-depth.)
  *
- * Mounted only on the app API routes, so `/api/auth/*` (session establishment,
- * incl. the curl-based token-pusher helper) is unaffected.
+ * Mounted only on the app API routes, so `/api/auth/*` (session establishment)
+ * is unaffected.
  */
 export function csrfGuard(req, res, next) {
   if (SAFE_METHODS.has(req.method)) return next();

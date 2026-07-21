@@ -90,9 +90,9 @@ export function CopilotSessions() {
           <details>
             <summary>Quick Setup</summary>
             <ol>
-              <li>Generate an API key in Settings → Agents</li>
-              <li>Create <code>~/.config/ado-dashboard/reporter.json</code> on your VM</li>
-              <li>Run <code>scripts/copilot-session-reporter.py</code> via cron every minute</li>
+              <li>Open <strong>Settings → Agents</strong> and click <strong>Generate key</strong></li>
+              <li>Download <code>reporter.json</code> and <code>copilot-session-reporter.py</code> from there</li>
+              <li>On your VM, drop <code>reporter.json</code> in <code>~/.config/ado-dashboard/</code> and run the script via cron every minute</li>
             </ol>
           </details>
         </div>

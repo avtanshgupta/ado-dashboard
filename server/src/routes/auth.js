@@ -82,16 +82,15 @@ router.post('/login', authLimiter, async (req, res) => {
   }
 });
 
-// Refresh the stored token for a user. Used by the re-paste banner AND the
-// local token-pusher helper (which has no cookie — the token itself authorizes).
+// Refresh the stored token for a user. Used by the in-app re-paste banner when a
+// token expires (the pasted token itself authorizes the refresh).
 router.post('/token', authLimiter, async (req, res) => {
   try {
     const { user, expiresAt } = await acceptToken((req.body || {}).token);
     const oldSid = readCookie(req, COOKIE);
     const existing = getSession(oldSid);
     // Re-authenticating a live browser session → rotate the sid so a previously
-    // captured cookie can't be replayed. No/foreign session (e.g. the headless
-    // token-pusher) → just mint one; the pusher ignores the cookie.
+    // captured cookie can't be replayed. No/foreign session → just mint one.
     const sid =
       existing && existing.userId === user.id
         ? rotateSession(oldSid, user)

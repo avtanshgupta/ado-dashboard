@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useConfig, useApp } from '../lib/AppContext.jsx';
 import { useToast } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
-import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser, Bot } from '../components/icons.jsx';
+import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser, Bot, Download, RefreshCw, Trash2, Check, Terminal } from '../components/icons.jsx';
 
 /**
  * Tag input that searches Azure DevOps users as you type (by alias or email) and
@@ -139,6 +139,13 @@ export function Settings() {
   const [templates, setTemplates] = useState(config.commentTemplates || []); // A4
   const [slaDays, setSlaDays] = useState(config.slaDays || 7); // B4
   const [density, setDensity] = useState(config.uiPrefs?.density || 'comfortable'); // E5
+  const [agents, setAgents] = useState(config.agents || {}); // Copilot agent session thresholds
+  // Reporter API key + setup-file download state (Settings → Agents).
+  const [keyStatus, setKeyStatus] = useState(null); // { hasKey, prefix, createdAt }
+  const [newKey, setNewKey] = useState(null); // plaintext key, shown once after generate
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [machineName, setMachineName] = useState('');
   const [wiQueries, setWiQueries] = useState(config.workItemSavedQueries || []); // WI
   const [wiQueryLink, setWiQueryLink] = useState('');
   const [wiQueryResolving, setWiQueryResolving] = useState(false);
@@ -155,6 +162,74 @@ export function Settings() {
       .catch(() => {});
     return () => { stop = true; };
   }, []);
+
+  // Load the reporter API-key status (non-secret: prefix + age only).
+  useEffect(() => {
+    let stop = false;
+    api.agentApiKeyStatus()
+      .then((s) => { if (!stop) setKeyStatus(s); })
+      .catch(() => { if (!stop) setKeyStatus({ hasKey: false }); });
+    return () => { stop = true; };
+  }, []);
+
+  function downloadFile(filename, text, type = 'application/octet-stream') {
+    const url = URL.createObjectURL(new Blob([text], { type }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function generateApiKey() {
+    setKeyBusy(true);
+    try {
+      const k = await api.agentGenerateApiKey();
+      setNewKey(k.apiKey);
+      setKeyStatus({ hasKey: true, prefix: k.prefix, createdAt: k.createdAt });
+      setKeyCopied(false);
+      toast.success('API key generated — copy it now, it won’t be shown again');
+    } catch (e) {
+      toast.error(`Couldn’t generate key: ${e.message}`);
+    } finally {
+      setKeyBusy(false);
+    }
+  }
+
+  async function revokeApiKey() {
+    setKeyBusy(true);
+    try {
+      await api.agentRevokeApiKey();
+      setKeyStatus({ hasKey: false });
+      setNewKey(null);
+      toast.info('API key revoked');
+    } catch (e) {
+      toast.error(`Couldn’t revoke key: ${e.message}`);
+    } finally {
+      setKeyBusy(false);
+    }
+  }
+
+  async function copyApiKey() {
+    try {
+      await navigator.clipboard.writeText(newKey);
+      setKeyCopied(true);
+      setTimeout(() => setKeyCopied(false), 1500);
+    } catch {
+      toast.error('Copy failed — select the key and copy manually');
+    }
+  }
+
+  function downloadReporterConfig() {
+    const cfg = {
+      dashboard_url: window.location.origin,
+      api_key: newKey,
+      machine_name: machineName.trim() || 'my-vm',
+    };
+    downloadFile('reporter.json', `${JSON.stringify(cfg, null, 2)}\n`, 'application/json');
+  }
 
   async function addRepoByLink() {
     const ref = repoRef.trim();
@@ -289,6 +364,7 @@ export function Settings() {
         slaDays: Number(slaDays),
         uiPrefs: { density },
         workItemSavedQueries: wiQueries.filter((q) => (q.id || '').trim()),
+        agents: { staleMinutes: Number(agents.staleMinutes) || 5, longRunningHours: Number(agents.longRunningHours) || 4 },
       });
       await reloadConfig();
       toast.success('Settings saved');
@@ -581,21 +657,87 @@ export function Settings() {
           {section === 'agents' && (
             <div className="card card-pad">
               <h3 className="settings-section-head">Copilot Agent Sessions</h3>
-              <p className="muted" style={{ fontSize: 12.5, marginBottom: 16 }}>
-                Configure the reporter script that sends heartbeats from your VMs.
+              <p className="muted" style={{ fontSize: 12.5, marginBottom: 18 }}>
+                See live Copilot CLI sessions across your VMs. Set up the reporter on each
+                machine in three steps — no repo checkout needed.
               </p>
+
+              {/* Step 1 — API key */}
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>1 · Generate an API key</div>
+              <div className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>
+                {keyStatus?.hasKey
+                  ? <>A key is active (<code>{keyStatus.prefix}…</code>{keyStatus.createdAt ? `, created ${new Date(keyStatus.createdAt).toLocaleDateString()}` : ''}). Regenerating replaces it.</>
+                  : 'The reporter authenticates with a personal API key. No key yet.'}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn accent" onClick={generateApiKey} disabled={keyBusy}>
+                  <RefreshCw size={14} /> {keyStatus?.hasKey ? 'Regenerate key' : 'Generate key'}
+                </button>
+                {keyStatus?.hasKey && (
+                  <button className="btn" onClick={revokeApiKey} disabled={keyBusy}>
+                    <Trash2 size={14} /> Revoke
+                  </button>
+                )}
+              </div>
+              {newKey && (
+                <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-subtle, rgba(127,127,127,0.06))' }}>
+                  <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+                    Copy this now — it won’t be shown again.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input readOnly value={newKey} onFocus={(e) => e.target.select()}
+                      style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'monospace', fontSize: 12.5 }} />
+                    <button className="btn" onClick={copyApiKey}>
+                      {keyCopied ? <><Check size={14} /> Copied</> : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2 — download setup files */}
+              <div style={{ fontWeight: 600, fontSize: 13, margin: '20px 0 6px' }}>2 · Download the setup files</div>
+              <div className="field-row">
+                <label className="field-label">Machine name</label>
+                <input value={machineName} onChange={(e) => setMachineName(e.target.value)} placeholder="my-vm" />
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                <button className="btn" onClick={downloadReporterConfig} disabled={!newKey} title={!newKey ? 'Generate a key first' : 'Download reporter.json'}>
+                  <Download size={14} /> reporter.json
+                </button>
+                <a className="btn" href={api.reporterScriptUrl} download="copilot-session-reporter.py">
+                  <Download size={14} /> copilot-session-reporter.py
+                </a>
+              </div>
+              {!newKey && (
+                <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                  Generate a key above to enable the <code>reporter.json</code> download — it embeds the key.
+                </div>
+              )}
+
+              {/* Step 3 — install on the VM */}
+              <div style={{ fontWeight: 600, fontSize: 13, margin: '20px 0 6px' }}>
+                <Terminal size={13} /> 3 · Install on the VM
+              </div>
+              <pre style={{ margin: 0, padding: 12, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-subtle, rgba(127,127,127,0.06))', fontSize: 12, overflowX: 'auto', whiteSpace: 'pre' }}>{`mkdir -p ~/.config/ado-dashboard
+mv ~/Downloads/reporter.json ~/.config/ado-dashboard/reporter.json
+mv ~/Downloads/copilot-session-reporter.py ~/
+# run every minute via cron
+( crontab -l 2>/dev/null; echo "* * * * * python3 $HOME/copilot-session-reporter.py" ) | crontab -`}</pre>
+              <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                Requires Python 3 on the VM. The reporter only sends metadata (repo, branch, cwd, status) — never terminal content or secrets.
+              </div>
+
+              {/* Display thresholds */}
+              <div style={{ fontWeight: 600, fontSize: 13, margin: '20px 0 6px' }}>Display thresholds</div>
               <div className="field-row">
                 <label className="field-label">Stale threshold (minutes)</label>
-                <input type="number" min={1} max={60} value={draft.agents?.staleMinutes || 5}
-                  onChange={(e) => setDraft((d) => ({ ...d, agents: { ...d.agents, staleMinutes: Number(e.target.value) } }))} />
+                <input type="number" min={1} max={60} value={agents.staleMinutes ?? 5}
+                  onChange={(e) => setAgents((a) => ({ ...a, staleMinutes: Number(e.target.value) }))} />
               </div>
               <div className="field-row">
                 <label className="field-label">Long-running threshold (hours)</label>
-                <input type="number" min={1} max={48} value={draft.agents?.longRunningHours || 4}
-                  onChange={(e) => setDraft((d) => ({ ...d, agents: { ...d.agents, longRunningHours: Number(e.target.value) } }))} />
-              </div>
-              <div className="muted" style={{ fontSize: 12, marginTop: 16 }}>
-                <strong>Reporter setup:</strong> Create <code>~/.config/ado-dashboard/reporter.json</code> on each VM with your dashboard URL and API credentials, then schedule <code>scripts/copilot-session-reporter.py</code> via cron.
+                <input type="number" min={1} max={48} value={agents.longRunningHours ?? 4}
+                  onChange={(e) => setAgents((a) => ({ ...a, longRunningHours: Number(e.target.value) }))} />
               </div>
             </div>
           )}

@@ -3,12 +3,18 @@
 Copilot CLI Session Reporter
 Detects running GitHub Copilot CLI agents and sends heartbeat to the dashboard.
 
-Setup:
-  1. Create config: ~/.config/ado-dashboard/reporter.yaml
-     dashboard_url: https://ado-dashboard.azurewebsites.net
-     api_key: <your-api-key-from-settings>
-     machine_name: VM-A
-  2. Run via cron: */1 * * * * python3 /path/to/copilot-session-reporter.py
+Setup (all from the dashboard — Settings → Agents):
+  1. Click "Generate API key" and then "Download reporter.json".
+  2. Move it into place:
+       mkdir -p ~/.config/ado-dashboard
+       mv ~/Downloads/reporter.json ~/.config/ado-dashboard/reporter.json
+  3. Schedule this script via cron (every minute):
+       ( crontab -l 2>/dev/null; echo "* * * * * python3 $HOME/copilot-session-reporter.py" ) | crontab -
+
+Config lives at ~/.config/ado-dashboard/reporter.json (or reporter.yaml if PyYAML
+is installed), e.g.:
+    { "dashboard_url": "https://ado-dashboard.azurewebsites.net",
+      "api_key": "adok_…", "machine_name": "VM-A" }
 
 Only collects metadata. NO secrets, NO terminal content, NO transcripts.
 """

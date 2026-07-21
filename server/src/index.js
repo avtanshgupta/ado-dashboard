@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { config } from './config.js';
 import apiRouter from './routes/api.js';
 import authRouter from './routes/auth.js';
-import agentsRouter from './routes/agents.js';
+import agentsRouter, { heartbeatRouter } from './routes/agents.js';
 import { sessionContext, warmIdentity } from './middleware/sessionContext.js';
 import { csrfGuard } from './middleware/csrf.js';
 import { securityHeaders } from './middleware/securityHeaders.js';
@@ -53,6 +53,12 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
 // Auth endpoints are public (they establish or refresh the session) and are
 // intentionally exempt from the CSRF header check (the token authorizes them).
 app.use('/api/auth', authRouter);
+
+// Reporter heartbeat is authenticated by a per-user API key (headless VMs with
+// no browser session). It MUST be mounted before the '/api' session-guarded
+// mount below: that mount's path ('/api') is a prefix of '/api/agents/heartbeat',
+// so its sessionContext would otherwise reject the cookieless reporter with 401.
+app.use('/api/agents/heartbeat', csrfGuard, heartbeatRouter);
 
 // Every /api request runs in an authenticated session context, and any
 // state-changing call must carry the CSRF header.

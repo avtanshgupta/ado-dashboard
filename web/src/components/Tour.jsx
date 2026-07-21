@@ -5,7 +5,7 @@ import { useConfig, useApp } from '../lib/AppContext.jsx';
 import { api } from '../lib/api.js';
 import {
   Rocket, LayoutDashboard, Zap, GitPullRequest, GitMerge, Workflow, Settings as SettingsIcon,
-  Search, Bell, PartyPopper, ChevronLeft, ChevronRight, X, ClipboardList, ListFilter,
+  Search, Bell, PartyPopper, ChevronLeft, ChevronRight, X, ClipboardList, ListFilter, Bot,
 } from './icons.jsx';
 
 // Each step optionally navigates to `route`, then spotlights the element carrying
@@ -86,6 +86,14 @@ const STEPS = [
     body: 'Explore builds under the Overview, kick one off from “Trigger a run”, and browse Runs history. Open any run to watch its stages and read logs live.',
   },
   {
+    key: 'agents',
+    route: '/agents',
+    anchor: 'nav-agents',
+    Icon: Bot,
+    title: 'Copilot agent sessions',
+    body: 'See live GitHub Copilot CLI sessions across your machines — grouped by host, each showing repo, branch and a status of active, idle, stale or ended. To feed it, open Settings → Agents: generate a personal API key, download reporter.json and the reporter script straight from the app, then run the script via cron every minute on each VM. You can tune the stale and long-running thresholds there too.',
+  },
+  {
     key: 'search',
     anchor: 'search',
     Icon: Search,
@@ -105,7 +113,7 @@ const STEPS = [
     anchor: 'settings-nav',
     Icon: SettingsIcon,
     title: 'Configure your workspace',
-    body: 'Settings are grouped into sections — General (monitored projects, repositories, time window, SLA, density), Team & Reviewers, Pipelines, Work Items (saved queries), Notifications, and templates. Add projects, repos and pipelines by pasting their URL; everything here is personal to you.',
+    body: 'Settings are grouped into sections — General (monitored projects, repositories, time window, SLA, density), Team & Reviewers, Pipelines, Work Items (saved queries), Notifications, comment templates, and Agents (reporter API key + session thresholds). Add projects, repos and pipelines by pasting their URL; everything here is personal to you.',
   },
   {
     key: 'finish',

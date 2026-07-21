@@ -18,9 +18,6 @@ const CLIPBOARD_TIPS = [
  * Token-paste sign-in. Used as a full-page screen for the first sign-in
  * (mode="login") and as a compact re-paste card when the token expires
  * (mode="reauth"). On success it calls onAuthed(result).
- *
- * Tip: run scripts/token-pusher.sh on your machine after the first sign-in and
- * the backend is kept refreshed for you — you stay signed in until you log out.
  */
 export function Login({ mode = 'login', knownUser, reason, onAuthed }) {
   const [token, setToken] = useState('');
@@ -36,7 +33,7 @@ export function Login({ mode = 'login', knownUser, reason, onAuthed }) {
     setBusy(true);
     setError(null);
     try {
-      const result = reauth ? await api.pushToken(token.trim()) : await api.login(token.trim());
+      const result = reauth ? await api.refreshToken(token.trim()) : await api.login(token.trim());
       setToken('');
       onAuthed?.(result);
     } catch (err) {
@@ -94,8 +91,8 @@ export function Login({ mode = 'login', knownUser, reason, onAuthed }) {
         {busy ? 'Signing in…' : reauth ? 'Update token' : 'Sign in'}
       </button>
       <p className="login-hint">
-        Tokens last ~75 minutes. Run the optional <code>token-pusher</code> helper on your
-        machine to refresh automatically so you stay signed in until you log out.
+        Tokens last ~75 minutes. When yours expires, the app prompts you to paste a
+        fresh one — you won't lose your place.
       </p>
     </form>
   );

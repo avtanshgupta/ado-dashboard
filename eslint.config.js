@@ -28,6 +28,7 @@ const browserGlobals = {
   window: 'readonly',
   document: 'readonly',
   navigator: 'readonly',
+  Blob: 'readonly',
   localStorage: 'readonly',
   sessionStorage: 'readonly',
   URL: 'readonly',

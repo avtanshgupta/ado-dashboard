@@ -147,7 +147,6 @@ ado-pr-dashboard/
 │   │   ├── components/           # tables, filters, charts, tour, command palette
 │   │   └── lib/                  # api client, hooks, SWR cache, formatters
 │   └── test/                     # node:test suites
-├── scripts/token-pusher.sh       # keep a hosted session refreshed
 ├── dev.mjs                       # concurrent dev runner (API + Vite)
 ├── Dockerfile                    # multi-stage build → single runtime image
 └── package.json                  # root scripts: install:all, dev, build, test, lint
@@ -205,9 +204,9 @@ and cache. There are two ways to sign in:
   # append | pbcopy (macOS), | clip (Windows) or | xclip -selection clipboard (Linux)
   ```
   The server stores a short-lived token per user in an **encrypted vault** keyed by
-  identity and hands the browser an opaque session cookie. The optional
-  [`scripts/token-pusher.sh`](scripts/token-pusher.sh) helper keeps a session
-  refreshed so users rarely re-paste. Set `DISABLE_AZ_FALLBACK=true` when hosting.
+  identity and hands the browser an opaque session cookie. When a token expires the
+  app shows an inline re-paste banner — paste a fresh token and you keep your place.
+  Set `DISABLE_AZ_FALLBACK=true` when hosting.
 
 **Access gate.** The single login gate is **group membership**: a user may sign in
 only if they belong to the `mdelinux@microsoft.com` (**MDE Linux**) Azure DevOps /
@@ -387,7 +386,7 @@ framework to install. Run a single suite with, e.g.,
 | Symptom | Fix |
 | --- | --- |
 | *"Not signed in"* locally | Run `az login`, then reload. |
-| 401 *token expired* when hosted | Paste a fresh token (see [Authentication](#-authentication--access-control)) or run `scripts/token-pusher.sh`. |
+| 401 *token expired* when hosted | Paste a fresh token when the re-paste banner appears (see [Authentication](#-authentication--access-control)). |
 | 403 *not a member of …* | Your account isn't in the `ALLOWED_GROUP` (MDE Linux). |
 | `fetch failed` / connect timeout to ADO | IPv6 routing; the server already forces `ipv4first`. Check network/VPN and that the org URL is reachable. |
 | Logins reset after a deploy | Set `DATA_DIR` to persistent storage (e.g. `/home/data`) and a stable `TOKEN_ENC_KEY`. |

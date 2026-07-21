@@ -46,6 +46,19 @@ test('slaDays is clamped to an integer range', () => {
   assert.equal(saveUserConfig(UID, { slaDays: 14 }).slaDays, 14);
 });
 
+test('agents thresholds seed defaults, merge partial patches, and validate ranges', () => {
+  const fresh = loadUserConfig('agents-user');
+  assert.deepEqual(fresh.agents, { staleMinutes: 5, longRunningHours: 4 });
+  // A partial patch keeps the untouched sibling value.
+  const patched = saveUserConfig('agents-user', { agents: { staleMinutes: 10 } });
+  assert.equal(patched.agents.staleMinutes, 10);
+  assert.equal(patched.agents.longRunningHours, 4);
+  // Out-of-range values are rejected (mirrors the Settings → Agents inputs).
+  assert.throws(() => saveUserConfig('agents-user', { agents: { staleMinutes: 0 } }), /staleMinutes must be an integer between 1 and 60/);
+  assert.throws(() => saveUserConfig('agents-user', { agents: { longRunningHours: 100 } }), /longRunningHours must be an integer between 1 and 48/);
+  assert.throws(() => saveUserConfig('agents-user', { agents: [] }), /agents must be an object/);
+});
+
 test('uiPrefs density merges and validates', () => {
   const ok = saveUserConfig(UID, { uiPrefs: { density: 'compact' } });
   assert.equal(ok.uiPrefs.density, 'compact');
@@ -126,6 +139,14 @@ test('work item saved queries validate id and default name to id', () => {
   assert.equal(ok.workItemSavedQueries[0].project, 'WD');
   assert.equal(ok.workItemSavedQueries[1].name, 'My Bugs');
   assert.throws(() => saveUserConfig('wi-user', { workItemSavedQueries: [{ name: 'no id' }] }), /id (is required|must be a string)/);
+});
+
+test('effectiveConfig exposes agent session thresholds (with defaults)', async () => {
+  const { effectiveConfig } = await import('../src/lib/userConfig.js');
+  const eff = effectiveConfig({ id: 'agents-eff', displayName: 'U' });
+  assert.deepEqual(eff.agents, { staleMinutes: 5, longRunningHours: 4 });
+  saveUserConfig('agents-eff', { agents: { staleMinutes: 12 } });
+  assert.equal(effectiveConfig({ id: 'agents-eff', displayName: 'U' }).agents.staleMinutes, 12);
 });
 
 test('effectiveConfig scopes workItemProjects to the monitored projects (with org)', async () => {

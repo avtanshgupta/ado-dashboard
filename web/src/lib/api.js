@@ -35,7 +35,7 @@ export const api = {
   // auth (token-paste sessions)
   me: () => req('/auth/me'),
   login: (token) => req('/auth/login', { method: 'POST', body: { token } }),
-  pushToken: (token) => req('/auth/token', { method: 'POST', body: { token } }),
+  refreshToken: (token) => req('/auth/token', { method: 'POST', body: { token } }),
   logout: () => req('/auth/logout', { method: 'POST' }),
 
   // config (per-user)
@@ -144,4 +144,10 @@ export const api = {
   agentSummary: () => req('/agents/summary'),
   agentEnd: (id) => req(`/agents/sessions/${id}`, { method: 'DELETE' }),
   agentPrune: () => req('/agents/prune', { method: 'POST' }),
+
+  // Reporter API keys + downloadable setup files
+  agentApiKeyStatus: () => req('/agents/api-key'),
+  agentGenerateApiKey: () => req('/agents/api-key', { method: 'POST' }),
+  agentRevokeApiKey: () => req('/agents/api-key', { method: 'DELETE' }),
+  reporterScriptUrl: `${BASE.replace(/\/api$/, '')}/copilot-session-reporter.py`,
 };

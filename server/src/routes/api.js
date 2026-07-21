@@ -82,6 +82,7 @@ function buildConfigResponse(cfg) {
     mutedRepos: cfg.mutedRepos,
     uiPrefs: cfg.uiPrefs,
     slaDays: cfg.slaDays,
+    agents: cfg.agents,
     workItemSavedQueries: cfg.workItemSavedQueries,
     workItemProjects: cfg.workItemProjects,
     defaults: config.defaults,

@@ -48,6 +48,10 @@ const UI_PREF_BOOLS = new Set(['onboarded']);
 
 export const DEFAULT_SLA_DAYS = 7; // B4 — idle days before a PR is "breaching SLA"
 
+// Copilot agent session thresholds (Settings → Agents). staleMinutes drives the
+// heartbeat-age cutoff after which a session is shown as "stale".
+export const DEFAULT_AGENT_PREFS = { staleMinutes: 5, longRunningHours: 4 };
+
 /** Short opaque id for user-created records (templates, saved views). */
 function rid() {
   return Math.random().toString(36).slice(2, 10);
@@ -69,6 +73,7 @@ function seed() {
     uiPrefs: { ...DEFAULT_UI_PREFS }, // E5
     slaDays: DEFAULT_SLA_DAYS, // B4
     workItemSavedQueries: [], // WI — saved ADO WIQL query ids to run in the Queries tab
+    agents: { ...DEFAULT_AGENT_PREFS }, // Copilot agent session thresholds
   };
 }
 
@@ -135,6 +140,7 @@ export function loadUserConfig(userId) {
     uiPrefs: { ...DEFAULT_UI_PREFS, ...(stored.uiPrefs || {}) },
     slaDays: Number.isInteger(stored.slaDays) ? stored.slaDays : DEFAULT_SLA_DAYS,
     workItemSavedQueries: Array.isArray(stored.workItemSavedQueries) ? stored.workItemSavedQueries : [],
+    agents: { ...DEFAULT_AGENT_PREFS, ...(stored.agents && typeof stored.agents === 'object' && !Array.isArray(stored.agents) ? stored.agents : {}) },
   };
 }
 
@@ -274,6 +280,23 @@ function validateAndNormalize(partial) {
   if (partial.projects !== undefined) clean.projects = validateProjects(partial.projects);
   if (partial.workItemSavedQueries !== undefined) clean.workItemSavedQueries = validateSavedQueries(partial.workItemSavedQueries);
 
+  if (partial.agents !== undefined) {
+    const a = partial.agents;
+    if (!a || typeof a !== 'object' || Array.isArray(a)) throw badRequest('agents must be an object.');
+    const out = {};
+    if (a.staleMinutes !== undefined) {
+      const n = Number(a.staleMinutes);
+      if (!Number.isInteger(n) || n < 1 || n > 60) throw badRequest('agents.staleMinutes must be an integer between 1 and 60.');
+      out.staleMinutes = n;
+    }
+    if (a.longRunningHours !== undefined) {
+      const n = Number(a.longRunningHours);
+      if (!Number.isInteger(n) || n < 1 || n > 48) throw badRequest('agents.longRunningHours must be an integer between 1 and 48.');
+      out.longRunningHours = n;
+    }
+    clean.agents = out;
+  }
+
   return clean;
 }
 
@@ -363,6 +386,7 @@ export function saveUserConfig(userId, partial) {
     if (cleaned[key] === undefined) continue;
     if (key === 'notificationPrefs') next[key] = { ...current.notificationPrefs, ...cleaned[key] };
     else if (key === 'uiPrefs') next[key] = { ...current.uiPrefs, ...cleaned[key] };
+    else if (key === 'agents') next[key] = { ...DEFAULT_AGENT_PREFS, ...current.agents, ...cleaned[key] };
     else if (key === 'repoProjects') next[key] = { ...current.repoProjects, ...cleaned[key] };
     else next[key] = cleaned[key];
   }
@@ -429,6 +453,7 @@ export function effectiveConfig(user) {
     mutedRepoSet: new Set((uc.mutedRepos || []).map((r) => r.toLowerCase())),
     uiPrefs: uc.uiPrefs || { ...DEFAULT_UI_PREFS },
     slaDays: uc.slaDays || DEFAULT_SLA_DAYS,
+    agents: { ...DEFAULT_AGENT_PREFS, ...(uc.agents || {}) },
     workItemSavedQueries: uc.workItemSavedQueries || [],
     // WI is scoped to the monitored projects (name + id + org).
     workItemProjects: projects.map((p) => ({ name: p.name, id: p.id, org: p.org || DEFAULT_ORG })),
