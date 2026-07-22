@@ -1,4 +1,5 @@
 import { X, Bot, FolderGit2, GitBranch, Terminal, Server, Hourglass, XCircle } from './icons.jsx';
+import { cleanVersion } from '../lib/format.js';
 
 const STATUS_COLORS = { active: '#22c55e', idle: '#eab308', stale: '#ef4444', ended: '#6b7280' };
 
@@ -57,7 +58,7 @@ export function SessionDetailDrawer({ session, machineName, onClose, onEnd }) {
           {(meta.version || meta.model || meta.os || meta.pid) && (
             <section className="drawer-section">
               <h4>Environment</h4>
-              {meta.version && <div className="dkv"><span>CLI version</span><span>{meta.version}</span></div>}
+              {meta.version && <div className="dkv"><span>CLI version</span><span title={meta.version}>{cleanVersion(meta.version)}</span></div>}
               {meta.model && <div className="dkv"><span>Model</span><span>{meta.model}</span></div>}
               {meta.os && <div className="dkv"><span>OS</span><span>{meta.os}</span></div>}
               {meta.pid && <div className="dkv"><span>PID</span><span>{meta.pid}</span></div>}

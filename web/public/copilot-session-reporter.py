@@ -45,10 +45,17 @@ _CLI_VERSION = None
 
 
 def cli_version():
-    """Best-effort GitHub Copilot CLI version (cached, no error if absent)."""
+    """Best-effort GitHub Copilot CLI version (cached, no error if absent).
+
+    `copilot --version` prints a whole sentence, e.g.
+    "GitHub Copilot CLI 1.0.74-1. Run 'copilot update'…" — extract just the
+    version token so the dashboard shows "1.0.74-1", not the full line.
+    """
     global _CLI_VERSION
     if _CLI_VERSION is None:
-        _CLI_VERSION = run_cmd("copilot --version 2>/dev/null") or ""
+        raw = run_cmd("copilot --version 2>/dev/null") or ""
+        m = re.search(r"\d+\.\d+(?:\.\d+)?(?:-\w+)?", raw)
+        _CLI_VERSION = m.group(0) if m else raw.strip()[:24]
     return _CLI_VERSION
 
 

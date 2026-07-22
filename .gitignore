@@ -4,3 +4,7 @@ server/.env
 server/data/
 *.log
 .DS_Store
+
+# Deployment staging artifacts (created by the App Service zip-deploy flow)
+dist/
+deploy.zip

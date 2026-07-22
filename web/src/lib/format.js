@@ -86,6 +86,18 @@ export function shortPath(path) {
   return parts[parts.length - 1] || String(path);
 }
 
+/**
+ * Extract a clean version token from a reporter's raw `--version` output.
+ * e.g. "GitHub Copilot CLI 1.0.74-1. Run 'copilot update'…" → "1.0.74-1".
+ * Falls back to a trimmed, length-capped string when no version pattern matches.
+ */
+export function cleanVersion(raw) {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  const m = s.match(/\d+\.\d+(?:\.\d+)?(?:-\w+)?/);
+  return m ? m[0] : s.replace(/^v/i, '').slice(0, 24);
+}
+
 export const RUN_STATUS_COLORS = {
   Succeeded: '#1f883d',
   Running: '#0969da',

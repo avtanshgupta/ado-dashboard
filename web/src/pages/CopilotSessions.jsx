@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { Loading, ErrorBox, useToast } from '../components/ui.jsx';
+import { useAsync } from '../lib/useAsync.js';
+import { Loading, ErrorBox, useToast, RefreshingTag } from '../components/ui.jsx';
 import { MachineGroup } from '../components/MachineGroup.jsx';
 import { AgentInsights } from '../components/AgentInsights.jsx';
 import { SessionDetailDrawer } from '../components/SessionDetailDrawer.jsx';
-import { Bot, RefreshCw, Server, Activity, TriangleAlert, BarChart3, Trash2, Search } from '../components/icons.jsx';
+import { Bot, RefreshCw, Server, Activity, TriangleAlert, Trash2, Search } from '../components/icons.jsx';
 
 function AgentOverview({ o }) {
   const tiles = [
@@ -52,50 +53,40 @@ function AgentOverview({ o }) {
 const STATUS_OPTS = ['all', 'active', 'idle', 'stale', 'ended'];
 
 export function CopilotSessions() {
-  const [groups, setGroups] = useState(null);
-  const [overview, setOverview] = useState(null);
-  const [keyStatus, setKeyStatus] = useState(null);
-  const [analytics, setAnalytics] = useState(null);
   const [prMatches, setPrMatches] = useState({});
   const [selected, setSelected] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [tab, setTab] = useState('overview');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('activity');
+  const [sortBy, setSortBy] = useState('name');
   const [hideEnded, setHideEnded] = useState(false);
   const toast = useToast();
   const prFetched = useRef(false);
 
-  const load = useCallback(async () => {
-    try {
-      const [g, o, k] = await Promise.all([
+  // Stale-while-revalidate: renders instantly from cache on revisit, then
+  // refreshes in the background (every 30s) so the latest data is always shown.
+  const main = useAsync(
+    async () => {
+      const [g, o, a] = await Promise.all([
         api.agentSessionsGrouped(),
         api.agentOverview(),
-        api.agentApiKeyStatus().catch(() => null),
+        api.agentAnalytics().catch(() => null),
       ]);
-      setGroups(g.value || []);
-      setOverview(o);
-      setKeyStatus(k);
-      setError(null);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return { groups: g.value || [], overview: o, analytics: a };
+    },
+    [],
+    { pollMs: 30_000, cacheKey: 'agents:dashboard' }
+  );
+  const keyInfo = useAsync(() => api.agentApiKeyStatus(), [], { pollMs: 60_000, cacheKey: 'agents:keystatus' });
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    const iv = setInterval(load, 30_000);
-    return () => clearInterval(iv);
-  }, [load]);
-
-  // Lazy: analytics when the Insights tab is first opened.
-  useEffect(() => {
-    if (tab === 'insights') api.agentAnalytics().then(setAnalytics).catch(() => setAnalytics(null));
-  }, [tab]);
+  const groups = main.data ? main.data.groups : null;
+  const overview = main.data ? main.data.overview : null;
+  const analytics = main.data ? main.data.analytics : null;
+  const keyStatus = keyInfo.data || null;
+  const loading = main.loading;
+  const error = main.error;
+  const revalidating = main.revalidating || keyInfo.revalidating;
+  const refresh = () => { main.refetch(); keyInfo.refetch(); };
 
   // Lazy, once: open-PR matches for live sessions (snapshotState is heavy).
   useEffect(() => {
@@ -104,12 +95,12 @@ export function CopilotSessions() {
     api.agentPrMatches().then((r) => setPrMatches(r.matches || {})).catch(() => {});
   }, [groups]);
 
-  const handleEnd = async (id) => { await api.agentEnd(id); load(); };
+  const handleEnd = async (id) => { await api.agentEnd(id); main.refetch(); };
   const handleRename = async (machineId, label) => {
     try {
       await api.agentSetMachineLabel(machineId, label);
       toast.success(label.trim() ? 'Machine renamed' : 'Machine name reset');
-      await load();
+      await main.refetch();
     } catch (e) {
       toast.error(`Rename failed: ${e.message}`);
       throw e;
@@ -119,7 +110,7 @@ export function CopilotSessions() {
     try {
       const res = await api.agentRemoveMachine(machineId);
       toast.success(`Removed “${machineId}” (${res.removed} session${res.removed !== 1 ? 's' : ''})`);
-      await load();
+      await main.refetch();
     } catch (e) {
       toast.error(`Remove failed: ${e.message}`);
     }
@@ -128,7 +119,7 @@ export function CopilotSessions() {
     try {
       const r = await api.agentClearEnded();
       toast.success(r.removed ? `Cleared ${r.removed} ended session${r.removed !== 1 ? 's' : ''}` : 'No ended sessions to clear');
-      await load();
+      await main.refetch();
     } catch (e) {
       toast.error(`Clear failed: ${e.message}`);
     }
@@ -154,13 +145,13 @@ export function CopilotSessions() {
       return { ...g, sessions };
     }).filter((g) => g.sessions.length > 0);
 
-    if (sortBy === 'name') gs = [...gs].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (sortBy === 'name') gs = [...gs].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
     else if (sortBy === 'sessions') gs = [...gs].sort((a, b) => b.sessions.length - a.sessions.length);
     return gs;
   }, [groups, query, statusFilter, sortBy, hideEnded]);
 
   if (loading) return <Loading label="Loading agent sessions…" />;
-  if (error) return <ErrorBox error={error} onRetry={load} />;
+  if (error && !groups) return <ErrorBox error={error} onRetry={refresh} />;
 
   const noSessions = !groups || groups.length === 0;
   const sessionCount = (groups || []).reduce((n, g) => n + g.sessions.length, 0);
@@ -169,8 +160,8 @@ export function CopilotSessions() {
   return (
     <div className="copilot-sessions-page">
       <div className="page-header">
-        <div className="page-title"><Bot size={22} /><h1>Copilot Agent Sessions</h1></div>
-        <button className="btn btn-ghost" onClick={load} title="Refresh"><RefreshCw size={15} /> Refresh</button>
+        <div className="page-title"><Bot size={22} /><h1>Copilot Agent Sessions</h1><RefreshingTag show={revalidating} /></div>
+        <button className="btn btn-ghost" onClick={refresh} title="Refresh"><RefreshCw size={15} /> Refresh</button>
       </div>
 
       {noSessions ? (
@@ -207,10 +198,19 @@ export function CopilotSessions() {
           <div className="subtabs">
             <button type="button" className={`subtab ${tab === 'overview' ? 'active' : ''}`} onClick={() => setTab('overview')}><Activity size={15} /> Overview</button>
             <button type="button" className={`subtab ${tab === 'sessions' ? 'active' : ''}`} onClick={() => setTab('sessions')}><Server size={15} /> Sessions{sessionCount ? ` (${sessionCount})` : ''}</button>
-            <button type="button" className={`subtab ${tab === 'insights' ? 'active' : ''}`} onClick={() => setTab('insights')}><BarChart3 size={15} /> Insights</button>
           </div>
 
-          {tab === 'overview' && overview && <AgentOverview o={overview} />}
+          {tab === 'overview' && (
+            <>
+              {overview && <AgentOverview o={overview} />}
+              {analytics && (
+                <>
+                  <h3 className="agent-subhead">Usage &amp; analytics</h3>
+                  <AgentInsights data={analytics} />
+                </>
+              )}
+            </>
+          )}
 
           {tab === 'sessions' && (
             <>
@@ -223,8 +223,8 @@ export function CopilotSessions() {
                   {STATUS_OPTS.map((s) => <option key={s} value={s}>{s === 'all' ? 'All statuses' : s[0].toUpperCase() + s.slice(1)}</option>)}
                 </select>
                 <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Sort machines">
-                  <option value="activity">Recent activity</option>
                   <option value="name">Name</option>
+                  <option value="activity">Recent activity</option>
                   <option value="sessions">Session count</option>
                 </select>
                 <label className="agent-toggle"><input type="checkbox" checked={hideEnded} onChange={(e) => setHideEnded(e.target.checked)} /> Hide ended</label>
@@ -252,8 +252,6 @@ export function CopilotSessions() {
               )}
             </>
           )}
-
-          {tab === 'insights' && (analytics ? <AgentInsights data={analytics} /> : <Loading label="Loading insights…" />)}
         </>
       )}
 

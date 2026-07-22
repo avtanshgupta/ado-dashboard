@@ -980,10 +980,13 @@ a.kv:hover { background: var(--surface-2); }
 .btn.danger:hover { background: rgba(239, 68, 68, 0.1); }
 
 /* Insights */
-.insight-bars { display: flex; align-items: flex-end; gap: 3px; height: 110px; padding-top: 8px; }
-.ib-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; min-width: 0; }
+.insight-chart { padding-top: 8px; }
+.insight-bars { display: flex; align-items: flex-end; gap: 3px; height: 110px; }
+.ib-col { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; min-width: 0; }
 .ib-bar { width: 70%; min-height: 2px; background: var(--accent); border-radius: 3px 3px 0 0; }
-.ib-label { font-size: 0.62rem; color: var(--text-subtle); white-space: nowrap; }
+.insight-xaxis { display: flex; gap: 3px; margin-top: 5px; }
+.insight-xaxis .ib-label { flex: 1; min-width: 0; text-align: center; font-size: 0.62rem; color: var(--text-subtle); white-space: nowrap; overflow: hidden; }
+.agent-subhead { font-size: 0.95rem; font-weight: 600; margin: 22px 0 12px; }
 .insight-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
 .insight-table th { text-align: left; color: var(--text-subtle); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; padding: 4px 8px; border-bottom: 1px solid var(--border); }
 .insight-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }

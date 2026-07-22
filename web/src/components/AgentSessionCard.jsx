@@ -1,4 +1,5 @@
 import { GitBranch, FolderGit2, Clock, Terminal, XCircle, Bot, Hourglass, GitPullRequest, ChevronRight } from './icons.jsx';
+import { cleanVersion } from '../lib/format.js';
 
 function timeAgo(ts) {
   if (!ts) return '—';
@@ -75,7 +76,7 @@ export function AgentSessionCard({ session, onEnd, onOpen, prMatch }) {
       </div>
       {(meta.version || meta.os || meta.pid || meta.model) && (
         <div className="session-meta">
-          {meta.version && <span className="meta-chip">v{String(meta.version).replace(/^v/, '')}</span>}
+          {meta.version && <span className="meta-chip" title={meta.version}>v{cleanVersion(meta.version)}</span>}
           {meta.model && <span className="meta-chip">{meta.model}</span>}
           {meta.os && <span className="meta-chip">{meta.os}</span>}
           {meta.pid && <span className="meta-chip">pid {meta.pid}</span>}

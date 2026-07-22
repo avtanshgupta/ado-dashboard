@@ -378,11 +378,11 @@ export function Settings() {
   const SECTIONS = [
     { id: 'general', label: 'General', Icon: SlidersHorizontal },
     { id: 'team', label: 'Team & Reviewers', Icon: Users },
-    { id: 'pipelines', label: 'Pipelines', Icon: Workflow },
-    { id: 'workitems', label: 'Work Items', Icon: ClipboardList },
-    { id: 'notifications', label: 'Notifications', Icon: Bell },
     { id: 'templates', label: 'Comment templates', Icon: MessageSquare },
+    { id: 'workitems', label: 'Work Items', Icon: ClipboardList },
+    { id: 'pipelines', label: 'Pipelines', Icon: Workflow },
     { id: 'agents', label: 'Agents', Icon: Bot },
+    { id: 'notifications', label: 'Notifications', Icon: Bell },
     { id: 'account', label: 'Account', Icon: CircleUser },
   ];
 

@@ -2,15 +2,21 @@ import { Clock, Server, FolderGit2, Activity } from './icons.jsx';
 
 function Bars({ items, labelKey, valueKey, maxLabels = 8 }) {
   const max = Math.max(1, ...items.map((i) => i[valueKey]));
-  const step = Math.ceil(items.length / maxLabels);
+  const step = Math.max(1, Math.ceil(items.length / maxLabels));
   return (
-    <div className="insight-bars">
-      {items.map((it, i) => (
-        <div className="ib-col" key={it[labelKey]} title={`${it[labelKey]}: ${it[valueKey]}`}>
-          <div className="ib-bar" style={{ height: `${Math.round((it[valueKey] / max) * 100)}%` }} />
-          <span className="ib-label">{i % step === 0 ? it[labelKey] : ''}</span>
-        </div>
-      ))}
+    <div className="insight-chart">
+      <div className="insight-bars">
+        {items.map((it) => (
+          <div className="ib-col" key={it[labelKey]} title={`${it[labelKey]}: ${it[valueKey]}`}>
+            <div className="ib-bar" style={{ height: `${Math.round((it[valueKey] / max) * 100)}%` }} />
+          </div>
+        ))}
+      </div>
+      <div className="insight-xaxis">
+        {items.map((it, i) => (
+          <span className="ib-label" key={it[labelKey]}>{i % step === 0 ? it[labelKey] : ''}</span>
+        ))}
+      </div>
     </div>
   );
 }
