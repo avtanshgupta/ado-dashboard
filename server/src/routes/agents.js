@@ -88,6 +88,40 @@ router.get('/summary', (req, res) => {
   }
 });
 
+router.get('/overview', (req, res) => {
+  try {
+    const user = currentUser();
+    const overview = agentService.getOverview(user.id, thresholds(user.id));
+    res.json(overview);
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Set (or clear) a custom display name for a machine. Body: { machineId, label }.
+router.put('/machines/label', (req, res) => {
+  try {
+    const user = currentUser();
+    const { machineId, label } = req.body || {};
+    const result = agentService.setMachineLabel(user.id, machineId, label);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Remove a machine and all its sessions from the dashboard. Body: { machineId }.
+router.post('/machines/remove', (req, res) => {
+  try {
+    const user = currentUser();
+    const { machineId } = req.body || {};
+    const result = agentService.removeMachine(user.id, machineId);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
 router.post('/prune', (req, res) => {
   try {
     const user = currentUser();

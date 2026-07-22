@@ -142,8 +142,13 @@ export const api = {
   agentSessions: () => req('/agents/sessions'),
   agentSessionsGrouped: () => req('/agents/sessions/grouped'),
   agentSummary: () => req('/agents/summary'),
+  agentOverview: () => req('/agents/overview'),
   agentEnd: (id) => req(`/agents/sessions/${id}`, { method: 'DELETE' }),
   agentPrune: () => req('/agents/prune', { method: 'POST' }),
+  agentSetMachineLabel: (machineId, label) =>
+    req('/agents/machines/label', { method: 'PUT', body: { machineId, label } }),
+  agentRemoveMachine: (machineId) =>
+    req('/agents/machines/remove', { method: 'POST', body: { machineId } }),
 
   // Reporter API keys + downloadable setup files
   agentApiKeyStatus: () => req('/agents/api-key'),

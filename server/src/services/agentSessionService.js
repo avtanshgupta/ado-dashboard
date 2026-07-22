@@ -90,16 +90,82 @@ export function getSessions(userId, { staleMs, endedMs } = {}) {
     .sort((a, b) => new Date(b.lastHeartbeat) - new Date(a.lastHeartbeat));
 }
 
-/** Get sessions grouped by machine. */
+/** Get sessions grouped by machine, with a per-user custom display name applied. */
 export function getSessionsByMachine(userId, opts = {}) {
-  const sessions = getSessions(userId, opts);
+  const store = loadSessions(userId);
+  const labels = store.machineLabels || {};
+  const now = Date.now();
+  const { staleMs, endedMs } = opts;
+  const sessions = store.sessions
+    .map((s) => enrichSession(s, now, staleMs, endedMs))
+    .sort((a, b) => new Date(b.lastHeartbeat) - new Date(a.lastHeartbeat));
+
   const grouped = {};
   for (const s of sessions) {
-    const key = s.machineName || s.machineId;
-    if (!grouped[key]) grouped[key] = { machine: key, machineId: s.machineId, sessions: [] };
-    grouped[key].sessions.push(s);
+    const mid = s.machineId;
+    if (!grouped[mid]) {
+      const label = labels[mid] || '';
+      grouped[mid] = {
+        machineId: mid,
+        machineName: s.machineName, // reporter-provided hostname
+        label, // user-set custom name (may be '')
+        name: label || s.machineName || mid, // resolved display name
+        sessions: [],
+      };
+    }
+    grouped[mid].sessions.push(s);
   }
-  return Object.values(grouped);
+  // Machines with the most recent heartbeat first (sessions are already sorted).
+  return Object.values(grouped).sort(
+    (a, b) => new Date(b.sessions[0].lastHeartbeat) - new Date(a.sessions[0].lastHeartbeat)
+  );
+}
+
+/** The per-user map of machineId → custom display name. */
+export function getMachineLabels(userId) {
+  const store = loadSessions(userId);
+  return store.machineLabels && typeof store.machineLabels === 'object' ? store.machineLabels : {};
+}
+
+/**
+ * Set (or clear) a custom display name for a machine. A blank label removes the
+ * override, reverting to the reporter-provided hostname. Returns { machineId, label }.
+ */
+export function setMachineLabel(userId, machineId, label) {
+  const mid = String(machineId || '').trim();
+  if (!mid) {
+    const e = new Error('machineId is required');
+    e.status = 400;
+    throw e;
+  }
+  const clean = String(label || '').trim().slice(0, 80);
+  const store = loadSessions(userId);
+  if (!store.machineLabels || typeof store.machineLabels !== 'object') store.machineLabels = {};
+  if (clean) store.machineLabels[mid] = clean;
+  else delete store.machineLabels[mid];
+  saveSessions(userId, store);
+  return { machineId: mid, label: clean };
+}
+
+/**
+ * Remove a machine from the dashboard: drop all of its sessions and any custom
+ * label. If the machine is still reporting, it reappears on its next heartbeat.
+ * Returns { machineId, removed } where `removed` is the session count deleted.
+ */
+export function removeMachine(userId, machineId) {
+  const mid = String(machineId || '').trim();
+  if (!mid) {
+    const e = new Error('machineId is required');
+    e.status = 400;
+    throw e;
+  }
+  const store = loadSessions(userId);
+  const before = store.sessions.length;
+  store.sessions = store.sessions.filter((s) => s.machineId !== mid);
+  const removed = before - store.sessions.length;
+  if (store.machineLabels && mid in store.machineLabels) delete store.machineLabels[mid];
+  saveSessions(userId, store);
+  return { machineId: mid, removed };
 }
 
 /** Mark a session as ended. */
@@ -135,5 +201,64 @@ export function getSummary(userId, opts = {}) {
     idle: sessions.filter((s) => s.status === 'idle').length,
     stale: sessions.filter((s) => s.status === 'stale').length,
     ended: sessions.filter((s) => s.status === 'ended').length,
+  };
+}
+
+/**
+ * A richer roll-up for the Agents overview: machine counts, status breakdown,
+ * busiest repositories, the longest-running live session, and last activity.
+ */
+export function getOverview(userId, opts = {}) {
+  const store = loadSessions(userId);
+  const labels = store.machineLabels || {};
+  const now = Date.now();
+  const { staleMs, endedMs } = opts;
+  const sessions = store.sessions.map((s) => enrichSession(s, now, staleMs, endedMs));
+
+  const byStatus = (st) => sessions.filter((s) => s.status === st).length;
+  const machineIds = new Set(sessions.map((s) => s.machineId));
+  const onlineMachines = new Set(
+    sessions.filter((s) => s.status === 'active' || s.status === 'idle').map((s) => s.machineId)
+  );
+  const live = sessions.filter((s) => s.status !== 'ended');
+
+  // Busiest repositories across live sessions.
+  const repoCounts = {};
+  for (const s of live) {
+    if (s.repo) repoCounts[s.repo] = (repoCounts[s.repo] || 0) + 1;
+  }
+  const topRepos = Object.entries(repoCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([repo, count]) => ({ repo, count }));
+
+  // Longest-running live session.
+  const longest = live.reduce((max, s) => (s.runtimeMs > (max?.runtimeMs ?? -1) ? s : max), null);
+  const longestRunning = longest
+    ? {
+        name: labels[longest.machineId] || longest.machineName || longest.machineId,
+        repo: longest.repo || '',
+        runtime: longest.runtime,
+      }
+    : null;
+
+  // Most recent heartbeat across all sessions.
+  const lastHeartbeatMs = sessions.reduce(
+    (m, s) => Math.max(m, new Date(s.lastHeartbeat).getTime() || 0),
+    0
+  );
+
+  return {
+    totalMachines: machineIds.size,
+    machinesOnline: onlineMachines.size,
+    totalSessions: sessions.length,
+    liveSessions: live.length,
+    active: byStatus('active'),
+    idle: byStatus('idle'),
+    stale: byStatus('stale'),
+    ended: byStatus('ended'),
+    topRepos,
+    longestRunning,
+    lastActivityAgo: lastHeartbeatMs ? formatDuration(now - lastHeartbeatMs) : null,
   };
 }
