@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useConfig, useApp } from '../lib/AppContext.jsx';
 import { useToast } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
-import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser, Bot, Download, RefreshCw, Trash2, Check, Terminal } from '../components/icons.jsx';
+import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser, Bot, Download, Trash2, Check, Terminal, Plus } from '../components/icons.jsx';
 
 /**
  * Tag input that searches Azure DevOps users as you type (by alias or email) and
@@ -99,6 +99,8 @@ const PREF_LABELS = {
   pipelineFailed: 'Pipeline failures',
   pipelineSucceeded: 'Pipeline successes',
   prClosed: 'PR merged or closed',
+  agentOffline: 'Agent machine went stale / offline',
+  agentLongRunning: 'Long-running agent sessions',
   browserPush: 'Desktop / browser notifications',
 };
 
@@ -141,8 +143,9 @@ export function Settings() {
   const [density, setDensity] = useState(config.uiPrefs?.density || 'comfortable'); // E5
   const [agents, setAgents] = useState(config.agents || {}); // Copilot agent session thresholds
   // Reporter API key + setup-file download state (Settings → Agents).
-  const [keyStatus, setKeyStatus] = useState(null); // { hasKey, prefix, createdAt }
-  const [newKey, setNewKey] = useState(null); // plaintext key, shown once after generate
+  const [keys, setKeys] = useState([]); // reporter API keys (multiple, named)
+  const [newKey, setNewKey] = useState(null); // freshly-created key { apiKey, keyId, label, prefix } — shown once
+  const [newKeyLabel, setNewKeyLabel] = useState('');
   const [keyBusy, setKeyBusy] = useState(false);
   const [keyCopied, setKeyCopied] = useState(false);
   const [machineName, setMachineName] = useState('');
@@ -163,14 +166,12 @@ export function Settings() {
     return () => { stop = true; };
   }, []);
 
-  // Load the reporter API-key status (non-secret: prefix + age only).
-  useEffect(() => {
-    let stop = false;
-    api.agentApiKeyStatus()
-      .then((s) => { if (!stop) setKeyStatus(s); })
-      .catch(() => { if (!stop) setKeyStatus({ hasKey: false }); });
-    return () => { stop = true; };
-  }, []);
+  // Load the reporter API keys (non-secret metadata only).
+  const loadKeys = useCallback(
+    () => api.agentApiKeys().then((r) => setKeys(r.value || [])).catch(() => setKeys([])),
+    []
+  );
+  useEffect(() => { loadKeys(); }, [loadKeys]);
 
   function downloadFile(filename, text, type = 'application/octet-stream') {
     const url = URL.createObjectURL(new Blob([text], { type }));
@@ -186,35 +187,34 @@ export function Settings() {
   async function generateApiKey() {
     setKeyBusy(true);
     try {
-      const k = await api.agentGenerateApiKey();
-      setNewKey(k.apiKey);
-      setKeyStatus({ hasKey: true, prefix: k.prefix, createdAt: k.createdAt });
+      const k = await api.agentGenerateApiKey(newKeyLabel);
+      setNewKey(k);
+      setMachineName((m) => m || k.label);
+      setNewKeyLabel('');
       setKeyCopied(false);
-      toast.success('API key generated — copy it now, it won’t be shown again');
+      await loadKeys();
+      toast.success('API key created — copy it now, it won’t be shown again');
     } catch (e) {
-      toast.error(`Couldn’t generate key: ${e.message}`);
+      toast.error(`Couldn’t create key: ${e.message}`);
     } finally {
       setKeyBusy(false);
     }
   }
 
-  async function revokeApiKey() {
-    setKeyBusy(true);
+  async function revokeKey(keyId) {
     try {
-      await api.agentRevokeApiKey();
-      setKeyStatus({ hasKey: false });
-      setNewKey(null);
-      toast.info('API key revoked');
+      await api.agentRevokeApiKey(keyId);
+      if (newKey && newKey.keyId === keyId) setNewKey(null);
+      await loadKeys();
+      toast.info('Key revoked');
     } catch (e) {
       toast.error(`Couldn’t revoke key: ${e.message}`);
-    } finally {
-      setKeyBusy(false);
     }
   }
 
   async function copyApiKey() {
     try {
-      await navigator.clipboard.writeText(newKey);
+      await navigator.clipboard.writeText(newKey.apiKey);
       setKeyCopied(true);
       setTimeout(() => setKeyCopied(false), 1500);
     } catch {
@@ -225,7 +225,7 @@ export function Settings() {
   function downloadReporterConfig() {
     const cfg = {
       dashboard_url: window.location.origin,
-      api_key: newKey,
+      api_key: newKey.apiKey,
       machine_name: machineName.trim() || 'my-vm',
     };
     downloadFile('reporter.json', `${JSON.stringify(cfg, null, 2)}\n`, 'application/json');
@@ -662,30 +662,47 @@ export function Settings() {
                 machine in three steps — no repo checkout needed.
               </p>
 
-              {/* Step 1 — API key */}
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>1 · Generate an API key</div>
+              {/* Step 1 — API keys */}
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>1 · Create an API key</div>
               <div className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>
-                {keyStatus?.hasKey
-                  ? <>A key is active (<code>{keyStatus.prefix}…</code>{keyStatus.createdAt ? `, created ${new Date(keyStatus.createdAt).toLocaleDateString()}` : ''}). Regenerating replaces it.</>
-                  : 'The reporter authenticates with a personal API key. No key yet.'}
+                Each reporter authenticates with a personal key. Create one per machine or fleet —
+                revoking or rotating one won’t affect your other reporters.
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+
+              {keys.length > 0 && (
+                <div className="apikey-list">
+                  {keys.map((k) => (
+                    <div className="apikey-row" key={k.keyId}>
+                      <div className="apikey-info">
+                        <span className="apikey-label">{k.label}</span>
+                        <code className="apikey-prefix">{k.prefix}…</code>
+                        <span className="muted apikey-dates">
+                          created {new Date(k.createdAt).toLocaleDateString()}
+                          {' · '}
+                          {k.lastUsedAt ? `last used ${new Date(k.lastUsedAt).toLocaleString()}` : 'never used'}
+                        </span>
+                      </div>
+                      <button className="btn-icon" title="Revoke key" onClick={() => revokeKey(k.keyId)}><Trash2 size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                <input value={newKeyLabel} onChange={(e) => setNewKeyLabel(e.target.value)} placeholder="Key name (e.g. build-box)" maxLength={60}
+                  style={{ flex: '1 1 180px', padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6 }} />
                 <button className="btn accent" onClick={generateApiKey} disabled={keyBusy}>
-                  <RefreshCw size={14} /> {keyStatus?.hasKey ? 'Regenerate key' : 'Generate key'}
+                  <Plus size={14} /> New key
                 </button>
-                {keyStatus?.hasKey && (
-                  <button className="btn" onClick={revokeApiKey} disabled={keyBusy}>
-                    <Trash2 size={14} /> Revoke
-                  </button>
-                )}
               </div>
+
               {newKey && (
                 <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-subtle, rgba(127,127,127,0.06))' }}>
                   <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                    Copy this now — it won’t be shown again.
+                    New key <strong>{newKey.label}</strong> — copy it now, it won’t be shown again.
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <input readOnly value={newKey} onFocus={(e) => e.target.select()}
+                    <input readOnly value={newKey.apiKey} onFocus={(e) => e.target.select()}
                       style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'monospace', fontSize: 12.5 }} />
                     <button className="btn" onClick={copyApiKey}>
                       {keyCopied ? <><Check size={14} /> Copied</> : 'Copy'}

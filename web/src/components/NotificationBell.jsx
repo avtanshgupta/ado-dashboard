@@ -6,7 +6,7 @@ import { repoShort } from '../lib/format.js';
 import { TimeAgo } from './ui.jsx';
 import {
   Bell, GitPullRequest, MessageSquare, Eye, XCircle, CheckCircle2,
-  GitMerge, Info, PartyPopper,
+  GitMerge, Info, PartyPopper, Bot, Clock,
 } from './icons.jsx';
 
 const TYPE_ICON = {
@@ -16,6 +16,8 @@ const TYPE_ICON = {
   'pipeline-failed': XCircle,
   'pipeline-succeeded': CheckCircle2,
   'pr-closed': GitMerge,
+  'agent-offline': Bot,
+  'agent-long-running': Clock,
 };
 
 const TYPE_LABEL = {
@@ -25,6 +27,8 @@ const TYPE_LABEL = {
   'pipeline-failed': 'Pipeline failures',
   'pipeline-succeeded': 'Pipeline successes',
   'pr-closed': 'Closed',
+  'agent-offline': 'Agent offline',
+  'agent-long-running': 'Long-running agents',
 };
 
 // Fallback poll cadence when SSE is unavailable.
@@ -170,6 +174,7 @@ export function NotificationBell() {
     } catch { /* still navigate even if marking failed */ }
     setOpen(false);
     if (item.repo && item.prId) navigate(`/pr/${encodeURIComponent(item.repo)}/${item.prId}`);
+    else if (item.link) navigate(item.link);
     else if (item.webUrl) window.open(item.webUrl, '_blank', 'noopener');
   }
 

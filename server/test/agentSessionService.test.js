@@ -55,6 +55,58 @@ test('removeMachine requires a machineId', () => {
   assert.throws(() => svc.removeMachine(UID, ''), /machineId is required/);
 });
 
+test('longRunning flag is set when runtime exceeds the threshold', () => {
+  const U = 'lr-user';
+  svc.heartbeat(U, { machineId: 'm', machineName: 'm', sessionId: 's', repo: 'r', status: 'active' });
+  // No threshold given → never long-running.
+  assert.equal(svc.getSessions(U)[0].longRunning, false);
+  // A huge threshold → not yet; a threshold below the (>=0) runtime → long-running.
+  assert.equal(svc.getSessions(U, { longRunningMs: 60 * 60 * 1000 })[0].longRunning, false);
+  assert.equal(svc.getSessions(U, { longRunningMs: -1 })[0].longRunning, true);
+  assert.equal(svc.getOverview(U, { longRunningMs: -1 }).longRunning, 1);
+});
+
+test('heartbeat merges metadata, counts beats, and records status transitions', () => {
+  const U = 'meta-user';
+  svc.heartbeat(U, { machineId: 'm', sessionId: 's', status: 'active', metadata: { version: '1.2.3' } });
+  svc.heartbeat(U, { machineId: 'm', sessionId: 's', status: 'idle', metadata: { pid: '42' } });
+  const s = svc.getSessions(U)[0];
+  assert.equal(s.heartbeatCount, 2);
+  assert.deepEqual(s.metadata, { version: '1.2.3', pid: '42' }); // merged
+  assert.deepEqual(s.history.map((h) => h.status), ['active', 'idle']); // transition recorded
+});
+
+test('getSessionById returns an enriched session or null', () => {
+  const U = 'byid-user';
+  const created = svc.heartbeat(U, { machineId: 'm', sessionId: 's', status: 'active' });
+  const got = svc.getSessionById(U, created.id);
+  assert.equal(got.id, created.id);
+  assert.ok('runtime' in got && 'lastHeartbeatAgo' in got);
+  assert.equal(svc.getSessionById(U, 'missing'), null);
+});
+
+test('clearEndedSessions removes computed-ended sessions immediately', () => {
+  const U = 'clear-user';
+  svc.heartbeat(U, { machineId: 'live', sessionId: 'a', status: 'active' });
+  const gone = svc.heartbeat(U, { machineId: 'old', sessionId: 'b', status: 'active' });
+  svc.endSession(U, gone.id); // mark ended
+  const removed = svc.clearEndedSessions(U);
+  assert.equal(removed, 1);
+  assert.deepEqual(svc.getSessionsByMachine(U).map((g) => g.machineId), ['live']);
+});
+
+test('getAnalytics reports agent-hours, per-machine, per-repo and histograms', () => {
+  const U = 'an-user';
+  svc.heartbeat(U, { machineId: 'm1', sessionId: 'a', repo: 'repoX', status: 'active' });
+  svc.heartbeat(U, { machineId: 'm2', sessionId: 'b', repo: 'repoY', status: 'active' });
+  const a = svc.getAnalytics(U);
+  assert.equal(a.totalSessions, 2);
+  assert.equal(typeof a.agentHours, 'number');
+  assert.equal(a.perMachine.length, 2);
+  assert.equal(a.byHour.length, 24);
+  assert.ok(a.perRepo.find((r) => r.repo === 'repoX'));
+});
+
 test('a custom label survives later heartbeats', () => {
   svc.setMachineLabel(UID, 'vm-1', 'Build Box');
   svc.heartbeat(UID, { machineId: 'vm-1', machineName: 'vm-1', sessionId: 's1', repo: 'repoA', status: 'active' });

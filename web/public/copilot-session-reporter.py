@@ -21,6 +21,7 @@ Only collects metadata. NO secrets, NO terminal content, NO transcripts.
 
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -38,6 +39,17 @@ try:
     from urllib.error import URLError, HTTPError
 except ImportError:
     sys.exit("Python 3 with urllib required")
+
+OS_INFO = f"{platform.system()} {platform.release()}".strip()
+_CLI_VERSION = None
+
+
+def cli_version():
+    """Best-effort GitHub Copilot CLI version (cached, no error if absent)."""
+    global _CLI_VERSION
+    if _CLI_VERSION is None:
+        _CLI_VERSION = run_cmd("copilot --version 2>/dev/null") or ""
+    return _CLI_VERSION
 
 
 CONFIG_PATH = Path.home() / ".config" / "ado-dashboard" / "reporter.yaml"
@@ -115,6 +127,15 @@ def detect_copilot_sessions():
             if not is_copilot:
                 continue
 
+            # Capture the copilot process pid (first matching child line).
+            copilot_pid = ""
+            for line in (children or "").splitlines():
+                if any(kw in line.lower() for kw in ["copilot", "github-copilot", "copilot-cli"]):
+                    first = line.split()[:1]
+                    if first and first[0].isdigit():
+                        copilot_pid = first[0]
+                    break
+
             # Get git info from the working directory
             repo = ""
             branch = ""
@@ -128,6 +149,13 @@ def detect_copilot_sessions():
                     f"git -C '{cwd}' rev-parse --abbrev-ref HEAD 2>/dev/null"
                 )
 
+            # Metadata is non-identifying: process id, CLI version, OS. No secrets.
+            metadata = {
+                k: v
+                for k, v in {"pid": copilot_pid, "version": cli_version(), "os": OS_INFO}.items()
+                if v
+            }
+
             sessions.append({
                 "sessionId": tmux_session,
                 "cwd": cwd,
@@ -135,6 +163,7 @@ def detect_copilot_sessions():
                 "branch": branch,
                 "agentType": "copilot-cli",
                 "status": "active",
+                "metadata": metadata,
             })
 
     return sessions

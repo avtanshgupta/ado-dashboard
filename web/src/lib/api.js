@@ -141,18 +141,23 @@ export const api = {
   // Agent sessions (Copilot CLI visibility)
   agentSessions: () => req('/agents/sessions'),
   agentSessionsGrouped: () => req('/agents/sessions/grouped'),
+  agentSession: (id) => req(`/agents/sessions/${encodeURIComponent(id)}`),
   agentSummary: () => req('/agents/summary'),
   agentOverview: () => req('/agents/overview'),
-  agentEnd: (id) => req(`/agents/sessions/${id}`, { method: 'DELETE' }),
+  agentAnalytics: () => req('/agents/analytics'),
+  agentPrMatches: () => req('/agents/pr-matches'),
+  agentEnd: (id) => req(`/agents/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   agentPrune: () => req('/agents/prune', { method: 'POST' }),
+  agentClearEnded: () => req('/agents/clear-ended', { method: 'POST' }),
   agentSetMachineLabel: (machineId, label) =>
     req('/agents/machines/label', { method: 'PUT', body: { machineId, label } }),
   agentRemoveMachine: (machineId) =>
     req('/agents/machines/remove', { method: 'POST', body: { machineId } }),
 
-  // Reporter API keys + downloadable setup files
+  // Reporter API keys (multiple, named) + downloadable setup files
   agentApiKeyStatus: () => req('/agents/api-key'),
-  agentGenerateApiKey: () => req('/agents/api-key', { method: 'POST' }),
-  agentRevokeApiKey: () => req('/agents/api-key', { method: 'DELETE' }),
+  agentApiKeys: () => req('/agents/api-keys'),
+  agentGenerateApiKey: (label) => req('/agents/api-keys', { method: 'POST', body: { label } }),
+  agentRevokeApiKey: (keyId) => req(`/agents/api-keys/${encodeURIComponent(keyId)}`, { method: 'DELETE' }),
   reporterScriptUrl: `${BASE.replace(/\/api$/, '')}/copilot-session-reporter.py`,
 };

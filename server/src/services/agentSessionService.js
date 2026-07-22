@@ -10,6 +10,7 @@ import { loadSessions, saveSessions } from '../lib/agentStore.js';
 const DEFAULT_STALE_MS = 5 * 60 * 1000;    // 5 minutes
 const DEFAULT_ENDED_MS = 30 * 60 * 1000;   // 30 minutes
 const DEFAULT_PRUNE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const HISTORY_CAP = 30;                     // bounded per-session status log
 
 function computeStatus(session, now, staleMs = DEFAULT_STALE_MS, endedMs = DEFAULT_ENDED_MS) {
   if (session.status === 'ended') return 'ended';
@@ -17,18 +18,6 @@ function computeStatus(session, now, staleMs = DEFAULT_STALE_MS, endedMs = DEFAU
   if (elapsed > endedMs) return 'ended';
   if (elapsed > staleMs) return 'stale';
   return session.status === 'idle' ? 'idle' : 'active';
-}
-
-function enrichSession(session, now, staleMs, endedMs) {
-  const computedStatus = computeStatus(session, now, staleMs, endedMs);
-  const runtime = now - new Date(session.startTime).getTime();
-  return {
-    ...session,
-    status: computedStatus,
-    runtimeMs: runtime,
-    runtime: formatDuration(runtime),
-    lastHeartbeatAgo: formatDuration(now - new Date(session.lastHeartbeat).getTime()),
-  };
 }
 
 function formatDuration(ms) {
@@ -39,24 +28,56 @@ function formatDuration(ms) {
   return `${h}h ${m}m`;
 }
 
+/** Attach computed status + derived timing/flags to a stored session. */
+function enrichSession(session, now, opts = {}) {
+  const { staleMs, endedMs, longRunningMs } = opts;
+  const computedStatus = computeStatus(session, now, staleMs, endedMs);
+  const runtimeMs = now - new Date(session.startTime).getTime();
+  return {
+    ...session,
+    status: computedStatus,
+    runtimeMs,
+    runtime: formatDuration(runtimeMs),
+    // "Long-running" flags a live session whose runtime exceeds the user's
+    // configured threshold (Settings → Agents → long-running hours).
+    longRunning: computedStatus !== 'ended' && longRunningMs != null && runtimeMs > longRunningMs,
+    lastHeartbeatAgo: formatDuration(now - new Date(session.lastHeartbeat).getTime()),
+  };
+}
+
+function pushHistory(session, entry) {
+  if (!Array.isArray(session.history)) session.history = [];
+  session.history.push(entry);
+  if (session.history.length > HISTORY_CAP) session.history = session.history.slice(-HISTORY_CAP);
+}
+
 /**
  * Upsert a session heartbeat. If a session with the same machineId + sessionId
- * exists, update its lastHeartbeat and metadata. Otherwise create a new session.
+ * exists, refresh it; otherwise create a new one. Records reporter-status
+ * transitions and merges reporter metadata (version/model/pid…).
  */
 export function heartbeat(userId, data) {
   const store = loadSessions(userId);
-  const now = new Date().toISOString();
+  const nowIso = new Date().toISOString();
   const existing = store.sessions.find(
     (s) => s.machineId === data.machineId && s.sessionId === data.sessionId && s.status !== 'ended'
   );
+  const reportedStatus = data.status || 'active';
 
   if (existing) {
-    existing.lastHeartbeat = now;
+    existing.lastHeartbeat = nowIso;
+    existing.heartbeatCount = (existing.heartbeatCount || 1) + 1;
     if (data.repo) existing.repo = data.repo;
     if (data.branch) existing.branch = data.branch;
     if (data.cwd) existing.cwd = data.cwd;
     if (data.agentType) existing.agentType = data.agentType;
-    if (data.status) existing.status = data.status;
+    if (data.metadata && typeof data.metadata === 'object') {
+      existing.metadata = { ...(existing.metadata || {}), ...data.metadata };
+    }
+    if (data.status && data.status !== existing.status) {
+      existing.status = data.status;
+      pushHistory(existing, { t: nowIso, status: data.status });
+    }
     saveSessions(userId, store);
     return existing;
   }
@@ -70,34 +91,50 @@ export function heartbeat(userId, data) {
     repo: data.repo || '',
     branch: data.branch || '',
     cwd: data.cwd || '',
-    status: data.status || 'active',
+    status: reportedStatus,
     agentType: data.agentType || 'copilot-cli',
-    startTime: now,
-    lastHeartbeat: now,
-    metadata: data.metadata || {},
+    startTime: nowIso,
+    lastHeartbeat: nowIso,
+    heartbeatCount: 1,
+    metadata: data.metadata && typeof data.metadata === 'object' ? data.metadata : {},
+    history: [{ t: nowIso, status: reportedStatus }],
   };
   store.sessions.push(session);
   saveSessions(userId, store);
   return session;
 }
 
-/** Get all sessions for a user with computed status. */
-export function getSessions(userId, { staleMs, endedMs } = {}) {
+/** Get all sessions for a user with computed status, newest heartbeat first. */
+export function getSessions(userId, opts = {}) {
   const store = loadSessions(userId);
   const now = Date.now();
   return store.sessions
-    .map((s) => enrichSession(s, now, staleMs, endedMs))
+    .map((s) => enrichSession(s, now, opts))
     .sort((a, b) => new Date(b.lastHeartbeat) - new Date(a.lastHeartbeat));
 }
 
-/** Get sessions grouped by machine, with a per-user custom display name applied. */
+/** A single enriched session by id (for the detail drawer), or null. */
+export function getSessionById(userId, id, opts = {}) {
+  const store = loadSessions(userId);
+  const s = store.sessions.find((x) => x.id === id);
+  return s ? enrichSession(s, Date.now(), opts) : null;
+}
+
+/** Roll a machine's session statuses up into a single machine-level status. */
+function machineStatus(sessions) {
+  if (sessions.some((s) => s.status === 'active')) return 'active';
+  if (sessions.some((s) => s.status === 'idle')) return 'idle';
+  if (sessions.some((s) => s.status === 'stale')) return 'stale';
+  return 'ended';
+}
+
+/** Get sessions grouped by machine, with custom name, machine status + last-seen. */
 export function getSessionsByMachine(userId, opts = {}) {
   const store = loadSessions(userId);
   const labels = store.machineLabels || {};
   const now = Date.now();
-  const { staleMs, endedMs } = opts;
   const sessions = store.sessions
-    .map((s) => enrichSession(s, now, staleMs, endedMs))
+    .map((s) => enrichSession(s, now, opts))
     .sort((a, b) => new Date(b.lastHeartbeat) - new Date(a.lastHeartbeat));
 
   const grouped = {};
@@ -115,9 +152,18 @@ export function getSessionsByMachine(userId, opts = {}) {
     }
     grouped[mid].sessions.push(s);
   }
-  // Machines with the most recent heartbeat first (sessions are already sorted).
-  return Object.values(grouped).sort(
-    (a, b) => new Date(b.sessions[0].lastHeartbeat) - new Date(a.sessions[0].lastHeartbeat)
+
+  const groups = Object.values(grouped);
+  for (const g of groups) {
+    g.status = machineStatus(g.sessions);
+    g.online = g.status === 'active' || g.status === 'idle';
+    g.longRunning = g.sessions.some((s) => s.longRunning);
+    g.lastSeen = g.sessions[0].lastHeartbeat; // newest (sessions already sorted)
+    g.lastSeenAgo = formatDuration(now - new Date(g.lastSeen).getTime());
+  }
+  // Live machines first, then by most-recent activity.
+  return groups.sort(
+    (a, b) => Number(b.online) - Number(a.online) || new Date(b.lastSeen) - new Date(a.lastSeen)
   );
 }
 
@@ -174,6 +220,7 @@ export function endSession(userId, sessionId) {
   const session = store.sessions.find((s) => s.id === sessionId);
   if (session) {
     session.status = 'ended';
+    pushHistory(session, { t: new Date().toISOString(), status: 'ended' });
     saveSessions(userId, store);
   }
   return session;
@@ -192,6 +239,19 @@ export function pruneSessions(userId, pruneMs = DEFAULT_PRUNE_MS) {
   return before - store.sessions.length;
 }
 
+/** Remove every ended session immediately (computed-ended included). */
+export function clearEndedSessions(userId, opts = {}) {
+  const store = loadSessions(userId);
+  const now = Date.now();
+  const before = store.sessions.length;
+  store.sessions = store.sessions.filter(
+    (s) => computeStatus(s, now, opts.staleMs, opts.endedMs) !== 'ended'
+  );
+  const removed = before - store.sessions.length;
+  if (removed) saveSessions(userId, store);
+  return removed;
+}
+
 /** Summary counts by status. */
 export function getSummary(userId, opts = {}) {
   const sessions = getSessions(userId, opts);
@@ -205,15 +265,15 @@ export function getSummary(userId, opts = {}) {
 }
 
 /**
- * A richer roll-up for the Agents overview: machine counts, status breakdown,
- * busiest repositories, the longest-running live session, and last activity.
+ * A richer roll-up for the Agents overview: machine counts (online/offline),
+ * status breakdown, long-running count, busiest repos, longest-running session,
+ * and last activity.
  */
 export function getOverview(userId, opts = {}) {
   const store = loadSessions(userId);
   const labels = store.machineLabels || {};
   const now = Date.now();
-  const { staleMs, endedMs } = opts;
-  const sessions = store.sessions.map((s) => enrichSession(s, now, staleMs, endedMs));
+  const sessions = store.sessions.map((s) => enrichSession(s, now, opts));
 
   const byStatus = (st) => sessions.filter((s) => s.status === st).length;
   const machineIds = new Set(sessions.map((s) => s.machineId));
@@ -222,7 +282,6 @@ export function getOverview(userId, opts = {}) {
   );
   const live = sessions.filter((s) => s.status !== 'ended');
 
-  // Busiest repositories across live sessions.
   const repoCounts = {};
   for (const s of live) {
     if (s.repo) repoCounts[s.repo] = (repoCounts[s.repo] || 0) + 1;
@@ -232,7 +291,6 @@ export function getOverview(userId, opts = {}) {
     .slice(0, 5)
     .map(([repo, count]) => ({ repo, count }));
 
-  // Longest-running live session.
   const longest = live.reduce((max, s) => (s.runtimeMs > (max?.runtimeMs ?? -1) ? s : max), null);
   const longestRunning = longest
     ? {
@@ -242,7 +300,6 @@ export function getOverview(userId, opts = {}) {
       }
     : null;
 
-  // Most recent heartbeat across all sessions.
   const lastHeartbeatMs = sessions.reduce(
     (m, s) => Math.max(m, new Date(s.lastHeartbeat).getTime() || 0),
     0
@@ -251,14 +308,88 @@ export function getOverview(userId, opts = {}) {
   return {
     totalMachines: machineIds.size,
     machinesOnline: onlineMachines.size,
+    machinesOffline: machineIds.size - onlineMachines.size,
     totalSessions: sessions.length,
     liveSessions: live.length,
     active: byStatus('active'),
     idle: byStatus('idle'),
     stale: byStatus('stale'),
     ended: byStatus('ended'),
+    longRunning: sessions.filter((s) => s.longRunning).length,
     topRepos,
     longestRunning,
     lastActivityAgo: lastHeartbeatMs ? formatDuration(now - lastHeartbeatMs) : null,
+  };
+}
+
+/**
+ * Usage analytics across all retained sessions: total agent-hours, per-machine
+ * uptime, busiest hour-of-day, recent daily activity, and per-repo counts.
+ */
+export function getAnalytics(userId, opts = {}) {
+  const store = loadSessions(userId);
+  const labels = store.machineLabels || {};
+  const now = Date.now();
+  const sessions = store.sessions.map((s) => enrichSession(s, now, opts));
+
+  const durationMs = (s) => {
+    const start = new Date(s.startTime).getTime();
+    const end = s.status === 'ended' ? new Date(s.lastHeartbeat).getTime() : now;
+    return Math.max(0, end - start);
+  };
+  const totalMs = sessions.reduce((a, s) => a + durationMs(s), 0);
+
+  const perMachineMap = {};
+  for (const s of sessions) {
+    const m =
+      perMachineMap[s.machineId] ||
+      (perMachineMap[s.machineId] = {
+        machineId: s.machineId,
+        name: labels[s.machineId] || s.machineName || s.machineId,
+        sessions: 0,
+        ms: 0,
+        lastSeenMs: 0,
+      });
+    m.sessions += 1;
+    m.ms += durationMs(s);
+    m.lastSeenMs = Math.max(m.lastSeenMs, new Date(s.lastHeartbeat).getTime());
+  }
+  const perMachine = Object.values(perMachineMap)
+    .map((m) => ({
+      machineId: m.machineId,
+      name: m.name,
+      sessions: m.sessions,
+      agentHours: +(m.ms / 3_600_000).toFixed(1),
+      lastSeenAgo: m.lastSeenMs ? formatDuration(now - m.lastSeenMs) : null,
+    }))
+    .sort((a, b) => b.agentHours - a.agentHours);
+
+  const byHour = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }));
+  for (const s of sessions) byHour[new Date(s.startTime).getHours()].count += 1;
+
+  const dayMap = {};
+  for (const s of sessions) {
+    const day = new Date(s.startTime).toISOString().slice(0, 10);
+    dayMap[day] = (dayMap[day] || 0) + 1;
+  }
+  const byDay = Object.entries(dayMap)
+    .sort()
+    .slice(-14)
+    .map(([day, count]) => ({ day, count }));
+
+  const repoMap = {};
+  for (const s of sessions) if (s.repo) repoMap[s.repo] = (repoMap[s.repo] || 0) + 1;
+  const perRepo = Object.entries(repoMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([repo, count]) => ({ repo, count }));
+
+  return {
+    totalSessions: sessions.length,
+    agentHours: +(totalMs / 3_600_000).toFixed(1),
+    perMachine,
+    byHour,
+    byDay,
+    perRepo,
   };
 }

@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { currentUser, currentConfig } from '../lib/context.js';
 import { writeJsonAtomic } from '../lib/atomicFile.js';
 import { snapshotState } from './prService.js';
+import * as agentService from './agentSessionService.js';
 
 const dataDir = join(config.dataDir, 'notif');
 
@@ -85,6 +86,7 @@ export async function poll() {
 
   if (!store.initialized) {
     store.snapshot = currentMap;
+    seedAgentState(uid, cfg, store); // baseline so we don't alert on first load
     store.initialized = true;
     save(uid, store);
     return { newItems: [], unread: getNotifications().unread };
@@ -142,9 +144,94 @@ export async function poll() {
   // C4 — drop notifications for muted repositories.
   const kept = mutedRepos.size ? newItems.filter((i) => !mutedRepos.has(String(i.repo).toLowerCase())) : newItems;
 
+  // Agent alerts (offline machines / long-running sessions) — not repo-muted.
+  let agentItems = [];
+  try {
+    agentItems = detectAgentItems(uid, cfg, store);
+  } catch {
+    agentItems = [];
+  }
+
   store.snapshot = currentMap;
-  store.items = [...kept, ...(store.items || [])].slice(0, 500);
+  store.items = [...agentItems, ...kept, ...(store.items || [])].slice(0, 500);
   save(uid, store);
 
-  return { newItems: kept, unread: getNotifications().unread };
+  return { newItems: [...agentItems, ...kept], unread: getNotifications().unread };
+}
+
+function agentThresholds(cfg) {
+  const staleMinutes = Number(cfg.agents?.staleMinutes) || 5;
+  const longRunningHours = Number(cfg.agents?.longRunningHours) || 4;
+  return { staleMs: staleMinutes * 60 * 1000, longRunningMs: longRunningHours * 60 * 60 * 1000 };
+}
+
+function makeAgentItem(type, machine, message) {
+  return {
+    id: `${type}:${machine}:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`,
+    type,
+    repo: machine, // shown as the badge on the notification
+    machine,
+    message,
+    link: '/agents',
+    timestamp: new Date().toISOString(),
+    read: false,
+  };
+}
+
+/** Baseline the agent state without emitting, so the first poll doesn't spam. */
+function seedAgentState(userId, cfg, store) {
+  try {
+    const groups = agentService.getSessionsByMachine(userId, agentThresholds(cfg));
+    const snap = {};
+    const long = [];
+    for (const g of groups) {
+      snap[g.machineId] = g.status;
+      for (const s of g.sessions) if (s.longRunning) long.push(s.id);
+    }
+    store.agentSnapshot = snap;
+    store.agentLongRun = long;
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Detect agent-alert transitions since the last poll: a machine that dropped from
+ * online → stale/ended, and sessions that newly crossed the long-running threshold.
+ */
+function detectAgentItems(userId, cfg, store) {
+  const prefs = cfg.notificationPrefs || {};
+  if (!prefs.agentOffline && !prefs.agentLongRunning) return [];
+  const groups = agentService.getSessionsByMachine(userId, agentThresholds(cfg));
+  const items = [];
+  const prevSnap = store.agentSnapshot || {};
+  const snap = {};
+  const alreadyLong = new Set(store.agentLongRun || []);
+  const stillLong = [];
+
+  for (const g of groups) {
+    snap[g.machineId] = g.status;
+    if (prefs.agentOffline) {
+      const was = prevSnap[g.machineId];
+      const wasOnline = was === 'active' || was === 'idle';
+      const nowDown = g.status === 'stale' || g.status === 'ended';
+      if (wasOnline && nowDown) {
+        items.push(makeAgentItem('agent-offline', g.name, `Machine “${g.name}” went ${g.status} — its reporter stopped heartbeating.`));
+      }
+    }
+    if (prefs.agentLongRunning) {
+      for (const s of g.sessions) {
+        if (s.longRunning) {
+          stillLong.push(s.id);
+          if (!alreadyLong.has(s.id)) {
+            items.push(makeAgentItem('agent-long-running', g.name, `Session on “${g.name}”${s.repo ? ` (${s.repo})` : ''} has been running ${s.runtime}.`));
+          }
+        }
+      }
+    }
+  }
+
+  store.agentSnapshot = snap;
+  store.agentLongRun = stillLong; // drop ids that ended / are no longer long-running
+  return items;
 }

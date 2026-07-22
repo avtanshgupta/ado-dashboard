@@ -935,6 +935,69 @@ a.kv:hover { background: var(--surface-2); }
 .agent-keywarn a { color: var(--accent); font-weight: 600; }
 .agent-keywarn code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
 
+/* Sessions toolbar */
+.agent-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.agent-search { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-subtle); flex: 1 1 220px; min-width: 180px; }
+.agent-search input { border: none; background: none; outline: none; color: var(--text); flex: 1; font-size: 13px; }
+.agent-toolbar select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 13px; }
+.agent-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-subtle); white-space: nowrap; }
+
+/* Session card extras */
+.agent-session-card.long-running { border-left: 3px solid #f59e0b; }
+.session-id-btn { display: inline-flex; align-items: center; gap: 2px; background: none; border: none; cursor: pointer; padding: 0; color: var(--text); font: inherit; }
+.session-id-btn:hover { color: var(--accent); }
+.session-id-btn .session-id { font-weight: 600; font-size: 0.85rem; }
+.badge-longrun { display: inline-flex; align-items: center; gap: 3px; background: rgba(245, 158, 11, 0.16); color: #b45309; padding: 1px 7px; border-radius: 10px; font-size: 0.68rem; font-weight: 600; }
+.session-header .agent-type { display: inline-flex; align-items: center; gap: 3px; color: var(--text-subtle); font-size: 0.7rem; }
+.session-details .pr-link { color: var(--accent); text-decoration: none; }
+.session-details .pr-link:hover { text-decoration: underline; }
+.session-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.meta-chip { background: var(--surface-2); color: var(--text-subtle); padding: 1px 7px; border-radius: 10px; font-size: 0.7rem; }
+.machine-lastseen { color: var(--text-subtle); font-weight: 400; }
+
+/* Session detail drawer */
+.drawer-root { position: fixed; inset: 0; z-index: 60; }
+.drawer-overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.35); }
+.drawer-panel { position: absolute; top: 0; right: 0; height: 100%; width: min(420px, 92vw); background: var(--surface); border-left: 1px solid var(--border); box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15); display: flex; flex-direction: column; animation: drawerIn 0.16s ease-out; }
+@keyframes drawerIn { from { transform: translateX(24px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.drawer-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.drawer-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawer-head .btn-icon { background: none; border: none; cursor: pointer; color: var(--text-subtle); padding: 4px; border-radius: 4px; }
+.drawer-head .btn-icon:hover { color: var(--text); background: var(--surface-2); }
+.drawer-body { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+.drawer-section h4 { margin: 0 0 8px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-subtle); }
+.drawer-section .dk { display: flex; align-items: center; gap: 6px; font-size: 0.86rem; padding: 2px 0; }
+.drawer-section .dk.mono { font-family: monospace; font-size: 0.78rem; word-break: break-all; }
+.drawer-section .dkv { display: flex; justify-content: space-between; gap: 10px; font-size: 0.86rem; padding: 3px 0; }
+.drawer-section .dkv > span:first-child { color: var(--text-subtle); }
+.drawer-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.drawer-timeline li { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+.drawer-timeline .tl-status { text-transform: capitalize; font-weight: 500; }
+.drawer-timeline .tl-time { margin-left: auto; font-size: 0.76rem; }
+.drawer-end { margin-top: 4px; }
+.btn.danger { color: #ef4444; border-color: #ef4444; }
+.btn.danger:hover { background: rgba(239, 68, 68, 0.1); }
+
+/* Insights */
+.insight-bars { display: flex; align-items: flex-end; gap: 3px; height: 110px; padding-top: 8px; }
+.ib-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; min-width: 0; }
+.ib-bar { width: 70%; min-height: 2px; background: var(--accent); border-radius: 3px 3px 0 0; }
+.ib-label { font-size: 0.62rem; color: var(--text-subtle); white-space: nowrap; }
+.insight-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.insight-table th { text-align: left; color: var(--text-subtle); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+.insight-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+
+/* API keys (Settings → Agents) */
+.apikey-list { display: flex; flex-direction: column; gap: 6px; }
+.apikey-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; }
+.apikey-info { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.apikey-label { font-weight: 600; font-size: 0.85rem; }
+.apikey-prefix { font-family: monospace; font-size: 0.78rem; color: var(--text-subtle); }
+.apikey-dates { font-size: 0.72rem; }
+.apikey-row .btn-icon { background: none; border: none; cursor: pointer; color: var(--text-subtle); padding: 4px; border-radius: 4px; }
+.apikey-row .btn-icon:hover { color: #ef4444; background: var(--surface-2); }
+
 .overview-tiles { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .ov-tile { display: flex; flex-direction: column; gap: 2px; padding: 12px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-width: 108px; flex: 1 1 auto; }
 .ov-tile .ov-num { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }

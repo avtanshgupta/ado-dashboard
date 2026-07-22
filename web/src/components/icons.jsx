@@ -30,6 +30,7 @@ export {
   Play,
   History,
   LineChart,
+  BarChart3,
   Activity,
   Dices,
   // work items

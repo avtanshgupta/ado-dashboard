@@ -8,47 +8,59 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 const DATA_DIR = mkdtempSync(join(os.tmpdir(), 'ado-agentkeys-'));
 process.env.DATA_DIR = DATA_DIR;
 
-const { generateApiKey, getApiKeyStatus, revokeApiKey, resolveUserIdByApiKey } =
+const { generateApiKey, listApiKeys, getApiKeyStatus, revokeApiKey, resolveUserIdByApiKey } =
   await import('../src/lib/agentApiKeys.js');
 const { agentApiKeyAuth } = await import('../src/middleware/agentApiKeyAuth.js');
 const { currentUser } = await import('../src/lib/context.js');
 
 const UID = 'user-abc';
 
-test('generate returns a prefixed key + non-secret metadata, resolvable to the user', () => {
-  const { apiKey, prefix, createdAt } = generateApiKey(UID);
+test('generate returns a named, prefixed key resolvable to the user', () => {
+  const { apiKey, keyId, label, prefix, createdAt } = generateApiKey(UID, 'build-box');
   assert.match(apiKey, /^adok_[A-Za-z0-9_-]+$/);
   assert.ok(apiKey.startsWith(prefix));
-  assert.ok(Date.parse(createdAt));
+  assert.equal(label, 'build-box');
+  assert.ok(keyId && Date.parse(createdAt));
   assert.equal(resolveUserIdByApiKey(apiKey), UID);
+});
 
-  const status = getApiKeyStatus(UID);
-  assert.equal(status.hasKey, true);
-  assert.equal(status.prefix, prefix);
+test('multiple keys coexist — generating does not revoke the others', () => {
+  const a = generateApiKey('multi', 'one');
+  const b = generateApiKey('multi', 'two');
+  assert.notEqual(a.apiKey, b.apiKey);
+  assert.equal(resolveUserIdByApiKey(a.apiKey), 'multi');
+  assert.equal(resolveUserIdByApiKey(b.apiKey), 'multi');
+  const keys = listApiKeys('multi');
+  assert.equal(keys.length, 2);
+  assert.deepEqual(keys.map((k) => k.label).sort(), ['one', 'two']);
+  assert.equal(getApiKeyStatus('multi').count, 2);
+});
+
+test('a blank label defaults to "reporter"', () => {
+  assert.equal(generateApiKey('blank', '   ').label, 'reporter');
 });
 
 test('the plaintext key is never written to disk (only its hash)', () => {
-  const { apiKey } = generateApiKey('disk-user');
+  const { apiKey } = generateApiKey('disk-user', 'x');
   const raw = readFileSync(join(DATA_DIR, 'agents', 'apikeys.json'), 'utf8');
-  assert.equal(raw.includes(apiKey), false); // stored as sha-256 hash, not plaintext
-  assert.equal(resolveUserIdByApiKey(apiKey), 'disk-user');
+  assert.equal(raw.includes(apiKey), false); // stored as sha-256 hash
 });
 
-test('regenerating replaces the previous key (one active key per user)', () => {
-  const first = generateApiKey('rotate-user');
-  assert.equal(resolveUserIdByApiKey(first.apiKey), 'rotate-user');
-  const second = generateApiKey('rotate-user');
-  assert.notEqual(second.apiKey, first.apiKey);
-  assert.equal(resolveUserIdByApiKey(first.apiKey), null); // old key no longer works
-  assert.equal(resolveUserIdByApiKey(second.apiKey), 'rotate-user');
+test('revoke removes only the targeted key', () => {
+  const a = generateApiKey('rev', 'keep');
+  const b = generateApiKey('rev', 'drop');
+  assert.equal(revokeApiKey('rev', b.keyId), true);
+  assert.equal(resolveUserIdByApiKey(b.apiKey), null);
+  assert.equal(resolveUserIdByApiKey(a.apiKey), 'rev'); // sibling still valid
+  assert.equal(listApiKeys('rev').length, 1);
+  assert.equal(revokeApiKey('rev', 'nonexistent'), false);
 });
 
-test('revoke removes the key; status + resolution reflect it', () => {
-  const { apiKey } = generateApiKey('revoke-user');
-  assert.equal(revokeApiKey('revoke-user'), true);
-  assert.equal(getApiKeyStatus('revoke-user').hasKey, false);
-  assert.equal(resolveUserIdByApiKey(apiKey), null);
-  assert.equal(revokeApiKey('revoke-user'), false); // idempotent
+test('resolve records a last-used timestamp', () => {
+  const { apiKey, keyId } = generateApiKey('used', 'x');
+  assert.equal(listApiKeys('used').find((k) => k.keyId === keyId).lastUsedAt, null);
+  resolveUserIdByApiKey(apiKey);
+  assert.ok(listApiKeys('used').find((k) => k.keyId === keyId).lastUsedAt);
 });
 
 test('unknown / malformed keys resolve to null', () => {
@@ -58,11 +70,10 @@ test('unknown / malformed keys resolve to null', () => {
 });
 
 test('middleware: a valid Bearer key establishes the user context', () => {
-  const { apiKey } = generateApiKey('mw-user');
+  const { apiKey } = generateApiKey('mw-user', 'x');
   const req = { headers: { authorization: `Bearer ${apiKey}` } };
   let seenUserId = null;
-  const next = () => { seenUserId = currentUser()?.id; };
-  agentApiKeyAuth(req, fakeRes(), next);
+  agentApiKeyAuth(req, fakeRes(), () => { seenUserId = currentUser()?.id; });
   assert.equal(seenUserId, 'mw-user');
 });
 

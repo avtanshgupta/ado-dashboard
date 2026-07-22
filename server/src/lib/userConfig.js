@@ -34,6 +34,8 @@ export const DEFAULT_NOTIF_PREFS = {
   pipelineFailed: false,
   pipelineSucceeded: false,
   prClosed: false,
+  agentOffline: false, // a reporting machine went stale/offline
+  agentLongRunning: false, // a session exceeded the long-running threshold
   browserPush: false, // C2 — desktop/browser notifications
 };
 

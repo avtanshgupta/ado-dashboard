@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Server, ChevronDown, ChevronRight, SquarePen, Check, X, Trash2 } from './icons.jsx';
+import { Server, ChevronDown, ChevronRight, SquarePen, Check, X, Trash2, Hourglass } from './icons.jsx';
 import { AgentSessionCard } from './AgentSessionCard.jsx';
 
-export function MachineGroup({ group, onEnd, onRename, onRemove }) {
-  const { machineId, machineName, label, name, sessions } = group;
+export function MachineGroup({ group, onEnd, onRename, onRemove, onOpenSession, prMatches }) {
+  const { machineId, machineName, label, name, sessions, status, lastSeenAgo, longRunning } = group;
   const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(label || '');
@@ -51,6 +51,7 @@ export function MachineGroup({ group, onEnd, onRename, onRemove }) {
           <span className="chevron">
             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </span>
+          <span className={`status-dot ${status || 'ended'}`} title={status} />
           <Server size={16} />
           {!editing && <span className="machine-name">{name || machineName || machineId}</span>}
         </button>
@@ -78,17 +79,31 @@ export function MachineGroup({ group, onEnd, onRename, onRemove }) {
               <Trash2 size={13} />
             </button>
             <span className="machine-meta">
+              {longRunning && <span className="badge-longrun" title="Has a long-running session"><Hourglass size={11} /></span>}
               {sessions.length} session{sessions.length !== 1 ? 's' : ''}
               {activeCount > 0 && <span className="active-badge">{activeCount} active</span>}
+              {lastSeenAgo && <span className="machine-lastseen">· seen {lastSeenAgo} ago</span>}
             </span>
           </>
         )}
       </div>
       {expanded && (
         <div className="machine-sessions">
-          {sessions.map((session) => (
-            <AgentSessionCard key={session.id} session={session} onEnd={onEnd} />
-          ))}
+          {sessions.map((session) => {
+            const prMatch =
+              prMatches && session.repo && session.branch
+                ? prMatches[`${session.repo.toLowerCase()}#${session.branch}`]
+                : null;
+            return (
+              <AgentSessionCard
+                key={session.id}
+                session={session}
+                onEnd={onEnd}
+                onOpen={onOpenSession}
+                prMatch={prMatch}
+              />
+            );
+          })}
         </div>
       )}
     </div>

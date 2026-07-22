@@ -1,4 +1,4 @@
-import { GitBranch, FolderGit2, Clock, Terminal, XCircle } from './icons.jsx';
+import { GitBranch, FolderGit2, Clock, Terminal, XCircle, Bot, Hourglass, GitPullRequest, ChevronRight } from './icons.jsx';
 
 function timeAgo(ts) {
   if (!ts) return '—';
@@ -28,15 +28,25 @@ const STATUS_COLORS = {
   ended: '#6b7280',
 };
 
-export function AgentSessionCard({ session, onEnd }) {
-  const { id, repo, branch, cwd, status, lastHeartbeat, startTime, agentType, sessionId } = session;
+export function AgentSessionCard({ session, onEnd, onOpen, prMatch }) {
+  const { id, repo, branch, cwd, status, lastHeartbeat, startTime, agentType, sessionId, longRunning, metadata } = session;
+  const meta = metadata || {};
 
   return (
-    <div className={`agent-session-card status-${status}`}>
+    <div className={`agent-session-card status-${status}${longRunning ? ' long-running' : ''}`}>
       <div className="session-header">
         <span className="status-dot" style={{ background: STATUS_COLORS[status] || '#6b7280' }} />
-        <span className="session-id">{sessionId || id.slice(0, 8)}</span>
+        <button className="session-id-btn" onClick={() => onOpen?.(session)} title="Session details">
+          <span className="session-id">{sessionId || id.slice(0, 8)}</span>
+          <ChevronRight size={13} />
+        </button>
         <span className={`status-badge ${status}`}>{status}</span>
+        {longRunning && (
+          <span className="badge-longrun" title="Running longer than your long-running threshold">
+            <Hourglass size={11} /> long-running
+          </span>
+        )}
+        {agentType && <span className="agent-type"><Bot size={11} /> {agentType}</span>}
         {status !== 'ended' && (
           <button className="btn-icon end-btn" onClick={() => onEnd(id)} title="End session">
             <XCircle size={14} />
@@ -50,6 +60,11 @@ export function AgentSessionCard({ session, onEnd }) {
         {branch && (
           <span className="detail"><GitBranch size={13} /> {branch}</span>
         )}
+        {prMatch && prMatch.count > 0 && (
+          <a className="detail pr-link" href={prMatch.url} target="_blank" rel="noopener noreferrer" title="Open pull request">
+            <GitPullRequest size={13} /> {prMatch.count} open PR{prMatch.count !== 1 ? 's' : ''}
+          </a>
+        )}
         {cwd && (
           <span className="detail"><Terminal size={13} /> {cwd}</span>
         )}
@@ -58,6 +73,14 @@ export function AgentSessionCard({ session, onEnd }) {
           <span className="detail runtime">⏱ {runtime(startTime)}</span>
         )}
       </div>
+      {(meta.version || meta.os || meta.pid || meta.model) && (
+        <div className="session-meta">
+          {meta.version && <span className="meta-chip">v{String(meta.version).replace(/^v/, '')}</span>}
+          {meta.model && <span className="meta-chip">{meta.model}</span>}
+          {meta.os && <span className="meta-chip">{meta.os}</span>}
+          {meta.pid && <span className="meta-chip">pid {meta.pid}</span>}
+        </div>
+      )}
     </div>
   );
 }
