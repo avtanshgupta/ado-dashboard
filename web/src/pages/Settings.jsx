@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useConfig, useApp } from '../lib/AppContext.jsx';
 import { useToast } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
+import { fmtDate, fmtDateShort, COMMON_TIME_ZONES, DEFAULT_TIME_ZONE } from '../lib/format.js';
 import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser, Bot, Download, Trash2, Check, Terminal, Plus } from '../components/icons.jsx';
 
 /**
@@ -143,6 +144,7 @@ export function Settings() {
   const [audit, setAudit] = useState(null); // B2 — recent state-changing actions
   const [slaDays, setSlaDays] = useState(config.slaDays || 7); // B4
   const [density, setDensity] = useState(config.uiPrefs?.density || 'comfortable'); // E5
+  const [timezone, setTimezone] = useState(config.uiPrefs?.timezone || DEFAULT_TIME_ZONE);
   const [agents, setAgents] = useState(config.agents || {}); // Copilot agent session thresholds
   // Reporter API key + setup-file download state (Settings → Agents).
   const [keys, setKeys] = useState([]); // reporter API keys (multiple, named)
@@ -374,7 +376,7 @@ export function Settings() {
           .filter((t) => t.name.trim() && t.body.trim())
           .map((t) => ({ id: t.id, name: t.name, body: t.body, ...(t.repo ? { repo: t.repo } : {}) })),
         slaDays: Number(slaDays),
-        uiPrefs: { density },
+        uiPrefs: { density, timezone },
         workItemSavedQueries: wiQueries.filter((q) => (q.id || '').trim()),
         agents: { staleMinutes: Number(agents.staleMinutes) || 5, longRunningHours: Number(agents.longRunningHours) || 4 },
       });
@@ -508,6 +510,18 @@ export function Settings() {
                       <option value="compact">Compact</option>
                     </select>
                   </span>
+                </div>
+                <div className="kv"><span className="k">Time zone</span>
+                  <span className="v">
+                    <select value={timezone} onChange={(e) => setTimezone(e.target.value)} style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 6 }}>
+                      {(COMMON_TIME_ZONES.some((z) => z.tz === timezone) ? COMMON_TIME_ZONES : [{ tz: timezone, label: timezone }, ...COMMON_TIME_ZONES]).map((z) => (
+                        <option key={z.tz} value={z.tz}>{z.label}</option>
+                      ))}
+                    </select>
+                  </span>
+                </div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+                  All dates and times across the app are shown in this zone. Now: {new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone })}.
                 </div>
                 <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
                   Idle PRs/work items past the SLA are flagged as breaching in Analytics, the Action Center and dashboard.
@@ -729,9 +743,9 @@ export function Settings() {
                         <span className="apikey-label">{k.label}</span>
                         <code className="apikey-prefix">{k.prefix}…</code>
                         <span className="muted apikey-dates">
-                          created {new Date(k.createdAt).toLocaleDateString()}
+                          created {fmtDateShort(k.createdAt)}
                           {' · '}
-                          {k.lastUsedAt ? `last used ${new Date(k.lastUsedAt).toLocaleString()}` : 'never used'}
+                          {k.lastUsedAt ? `last used ${fmtDate(k.lastUsedAt)}` : 'never used'}
                         </span>
                       </div>
                       <button className="btn-icon" title="Revoke key" onClick={() => revokeKey(k.keyId)}><Trash2 size={14} /></button>
@@ -840,7 +854,7 @@ mv ~/Downloads/copilot-session-reporter.py ~/
                       <span className="badge" style={{ minWidth: 46, textAlign: 'center' }}>{a.method}</span>
                       <span style={{ color: a.ok ? 'var(--ok, inherit)' : 'var(--danger, #c00)', fontWeight: 600, minWidth: 34 }}>{a.status}</span>
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--mono, monospace)' }} title={a.path}>{a.path}</span>
-                      <span className="muted" style={{ whiteSpace: 'nowrap' }}>{a.t ? new Date(a.t).toLocaleString() : ''}</span>
+                      <span className="muted" style={{ whiteSpace: 'nowrap' }}>{a.t ? fmtDate(a.t) : ''}</span>
                     </div>
                   ))}
                 </div>

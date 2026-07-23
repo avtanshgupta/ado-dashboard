@@ -1,3 +1,49 @@
+// The IANA time zone used to render all absolute dates/times in the app. It is a
+// module-level value (default IST) set once from the user's config at bootstrap
+// and whenever the setting changes — so every fmtDate/fmtDateShort call across
+// the app renders in the chosen zone without threading it through each caller.
+export const DEFAULT_TIME_ZONE = 'Asia/Kolkata';
+let currentTimeZone = DEFAULT_TIME_ZONE;
+
+/** Set the active time zone (falls back to IST for an empty/invalid value). */
+export function setTimeZone(tz) {
+  if (typeof tz === 'string' && tz.trim()) {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: tz.trim() });
+      currentTimeZone = tz.trim();
+      return;
+    } catch {
+      /* keep the previous zone on an invalid value */
+    }
+  }
+}
+
+/** The active time zone. */
+export function getTimeZone() {
+  return currentTimeZone;
+}
+
+/** Curated IANA zones for the Settings picker (IST first). */
+export const COMMON_TIME_ZONES = [
+  { tz: 'Asia/Kolkata', label: 'India — IST (Asia/Kolkata)' },
+  { tz: 'UTC', label: 'UTC' },
+  { tz: 'America/Los_Angeles', label: 'US Pacific (Los Angeles)' },
+  { tz: 'America/Denver', label: 'US Mountain (Denver)' },
+  { tz: 'America/Chicago', label: 'US Central (Chicago)' },
+  { tz: 'America/New_York', label: 'US Eastern (New York)' },
+  { tz: 'America/Sao_Paulo', label: 'Brazil (São Paulo)' },
+  { tz: 'Europe/London', label: 'UK (London)' },
+  { tz: 'Europe/Berlin', label: 'Central Europe (Berlin)' },
+  { tz: 'Europe/Moscow', label: 'Moscow' },
+  { tz: 'Asia/Dubai', label: 'Gulf (Dubai)' },
+  { tz: 'Asia/Karachi', label: 'Pakistan (Karachi)' },
+  { tz: 'Asia/Singapore', label: 'Singapore' },
+  { tz: 'Asia/Shanghai', label: 'China (Shanghai)' },
+  { tz: 'Asia/Tokyo', label: 'Japan (Tokyo)' },
+  { tz: 'Australia/Sydney', label: 'Australia (Sydney)' },
+  { tz: 'Pacific/Auckland', label: 'New Zealand (Auckland)' },
+];
+
 export function timeAgo(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -22,6 +68,7 @@ export function fmtDate(dateStr) {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: currentTimeZone,
   });
 }
 
@@ -31,6 +78,7 @@ export function fmtDateShort(dateStr) {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    timeZone: currentTimeZone,
   });
 }
 

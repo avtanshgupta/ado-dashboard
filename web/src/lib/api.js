@@ -145,7 +145,7 @@ export const api = {
   agentSession: (id) => req(`/agents/sessions/${encodeURIComponent(id)}`),
   agentSummary: () => req('/agents/summary'),
   agentOverview: () => req('/agents/overview'),
-  agentAnalytics: () => req('/agents/analytics'),
+  agentAnalytics: (tz) => req(`/agents/analytics${tz ? `?tz=${encodeURIComponent(tz)}` : ''}`),
   agentPrMatches: () => req('/agents/pr-matches'),
   agentEnd: (id) => req(`/agents/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   agentPrune: () => req('/agents/prune', { method: 'POST' }),

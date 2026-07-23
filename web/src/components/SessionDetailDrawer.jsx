@@ -1,15 +1,11 @@
 import { X, Bot, FolderGit2, GitBranch, Terminal, Server, Hourglass, XCircle } from './icons.jsx';
-import { cleanVersion } from '../lib/format.js';
+import { cleanVersion, fmtDate } from '../lib/format.js';
 
 const STATUS_COLORS = { active: '#22c55e', idle: '#eab308', stale: '#ef4444', ended: '#6b7280' };
 
 function fmtTime(ts) {
   if (!ts) return '—';
-  try {
-    return new Date(ts).toLocaleString();
-  } catch {
-    return ts;
-  }
+  return fmtDate(ts) || ts;
 }
 
 function fmtSeconds(seconds) {

@@ -12,6 +12,7 @@ import { snapshotState } from '../services/prService.js';
 import { currentUser } from '../lib/context.js';
 import { loadUserConfig } from '../lib/userConfig.js';
 import { generateApiKey, getApiKeyStatus, listApiKeys, revokeApiKey } from '../lib/agentApiKeys.js';
+import { isValidTimeZone } from '../lib/userConfig.js';
 import { agentApiKeyAuth } from '../middleware/agentApiKeyAuth.js';
 import { createRateLimit } from '../middleware/rateLimit.js';
 
@@ -117,7 +118,12 @@ router.get('/overview', (req, res) => {
 router.get('/analytics', (req, res) => {
   try {
     const user = currentUser();
-    res.json(agentService.getAnalytics(user.id, thresholds(user.id)));
+    // Bucket hour/day by the caller's zone: an explicit ?tz= wins, else the
+    // user's saved setting, else IST.
+    const cfg = loadUserConfig(user.id);
+    const requested = req.query.tz;
+    const tz = (isValidTimeZone(requested) && requested) || cfg.uiPrefs?.timezone || 'Asia/Kolkata';
+    res.json(agentService.getAnalytics(user.id, { ...thresholds(user.id), tz }));
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }

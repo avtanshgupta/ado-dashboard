@@ -7,7 +7,7 @@ import { mkdtempSync } from 'node:fs';
 // Point per-user state at a throwaway dir before importing (module reads config).
 process.env.DATA_DIR = mkdtempSync(join(os.tmpdir(), 'ado-userconfig-'));
 
-const { loadUserConfig, saveUserConfig } = await import('../src/lib/userConfig.js');
+const { loadUserConfig, saveUserConfig, isValidTimeZone } = await import('../src/lib/userConfig.js');
 
 const UID = 'test-user-1';
 
@@ -94,6 +94,27 @@ test('uiPrefs.onboarded seeds false and coerces to boolean, preserving density',
   const set = saveUserConfig('onboarding-user', { uiPrefs: { onboarded: 'yes' } });
   assert.equal(set.uiPrefs.onboarded, true); // coerced to boolean
   assert.equal(set.uiPrefs.density, 'comfortable'); // partial patch keeps density
+});
+
+test('uiPrefs.timezone defaults to IST and accepts a valid IANA zone', () => {
+  const fresh = loadUserConfig('tz-user');
+  assert.equal(fresh.uiPrefs.timezone, 'Asia/Kolkata'); // default IST
+  const set = saveUserConfig('tz-user', { uiPrefs: { timezone: 'America/New_York' } });
+  assert.equal(set.uiPrefs.timezone, 'America/New_York');
+  assert.equal(set.uiPrefs.density, 'comfortable'); // partial patch keeps density
+});
+
+test('uiPrefs.timezone rejects an invalid zone', () => {
+  assert.throws(() => saveUserConfig('tz-user', { uiPrefs: { timezone: 'Mars/Phobos' } }), /valid IANA time zone/);
+  assert.throws(() => saveUserConfig('tz-user', { uiPrefs: { timezone: '' } }), /valid IANA time zone/);
+});
+
+test('isValidTimeZone accepts real zones and rejects junk', () => {
+  assert.equal(isValidTimeZone('Asia/Kolkata'), true);
+  assert.equal(isValidTimeZone('UTC'), true);
+  assert.equal(isValidTimeZone('Not/AZone'), false);
+  assert.equal(isValidTimeZone(''), false);
+  assert.equal(isValidTimeZone(null), false);
 });
 
 test('saved views persist filters and sort as objects', () => {

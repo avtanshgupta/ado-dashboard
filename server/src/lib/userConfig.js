@@ -44,9 +44,21 @@ const NOTIF_PREF_ENUMS = {};
 export const DEFAULT_UI_PREFS = {
   density: 'comfortable', // E5 — 'comfortable' | 'compact' table rows
   onboarded: false, // first-run guided tour: true once the user finishes/skips it
+  timezone: 'Asia/Kolkata', // IANA time zone for all displayed times (default IST)
 };
 const UI_PREF_ENUMS = { density: new Set(['comfortable', 'compact']) };
 const UI_PREF_BOOLS = new Set(['onboarded']);
+
+/** True if `tz` is an IANA time zone the runtime's Intl accepts. */
+export function isValidTimeZone(tz) {
+  if (typeof tz !== 'string' || !tz.trim()) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz.trim() });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export const DEFAULT_SLA_DAYS = 7; // B4 — idle days before a PR is "breaching SLA"
 
@@ -270,6 +282,11 @@ function validateAndNormalize(partial) {
     for (const [k, v] of Object.entries(up)) {
       if (!(k in DEFAULT_UI_PREFS)) continue;
       if (UI_PREF_BOOLS.has(k)) { prefs[k] = Boolean(v); continue; }
+      if (k === 'timezone') {
+        if (!isValidTimeZone(v)) throw badRequest('uiPrefs.timezone must be a valid IANA time zone (e.g. Asia/Kolkata).');
+        prefs[k] = v.trim();
+        continue;
+      }
       if (UI_PREF_ENUMS[k] && !UI_PREF_ENUMS[k].has(v)) throw badRequest(`uiPrefs.${k} must be one of: ${[...UI_PREF_ENUMS[k]].join(', ')}.`);
       prefs[k] = v;
     }

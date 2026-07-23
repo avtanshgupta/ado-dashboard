@@ -28,6 +28,33 @@ function formatDuration(ms) {
   return `${h}h ${m}m`;
 }
 
+/** Hour-of-day (0–23) of a date in a given IANA time zone; falls back to UTC-ish. */
+function hourInTz(date, tz) {
+  try {
+    const h = parseInt(
+      new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(date),
+      10
+    );
+    return Number.isFinite(h) ? h % 24 : date.getUTCHours();
+  } catch {
+    return date.getUTCHours();
+  }
+}
+
+/** Calendar day (YYYY-MM-DD) of a date in a given IANA time zone. */
+function dayInTz(date, tz) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+}
+
 /** Attach computed status + derived timing/flags to a stored session. */
 function enrichSession(session, now, opts = {}) {
   const { staleMs, endedMs, longRunningMs } = opts;
@@ -325,11 +352,14 @@ export function getOverview(userId, opts = {}) {
 /**
  * Usage analytics across all retained sessions: total agent-hours, per-machine
  * uptime, busiest hour-of-day, recent daily activity, and per-repo counts.
+ * Hour/day buckets are computed in the caller's time zone (`opts.tz`, default IST)
+ * so the "busiest hours" and "daily activity" charts match what the user sees.
  */
 export function getAnalytics(userId, opts = {}) {
   const store = loadSessions(userId);
   const labels = store.machineLabels || {};
   const now = Date.now();
+  const tz = opts.tz || 'Asia/Kolkata';
   const sessions = store.sessions.map((s) => enrichSession(s, now, opts));
 
   const durationMs = (s) => {
@@ -365,11 +395,11 @@ export function getAnalytics(userId, opts = {}) {
     .sort((a, b) => b.agentHours - a.agentHours);
 
   const byHour = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }));
-  for (const s of sessions) byHour[new Date(s.startTime).getHours()].count += 1;
+  for (const s of sessions) byHour[hourInTz(new Date(s.startTime), tz)].count += 1;
 
   const dayMap = {};
   for (const s of sessions) {
-    const day = new Date(s.startTime).toISOString().slice(0, 10);
+    const day = dayInTz(new Date(s.startTime), tz);
     dayMap[day] = (dayMap[day] || 0) + 1;
   }
   const byDay = Object.entries(dayMap)
@@ -391,5 +421,6 @@ export function getAnalytics(userId, opts = {}) {
     byHour,
     byDay,
     perRepo,
+    timezone: tz,
   };
 }

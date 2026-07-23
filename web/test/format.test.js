@@ -10,6 +10,11 @@ import {
   isGateInFlight,
   rerunnableBuilds,
   canRerunGate,
+  fmtDate,
+  fmtDateShort,
+  setTimeZone,
+  getTimeZone,
+  DEFAULT_TIME_ZONE,
 } from '../src/lib/format.js';
 
 test('timeAgo produces coarse relative labels', () => {
@@ -63,4 +68,41 @@ test('gate in-flight + rerunnable helpers', () => {
   assert.equal(rerunnableBuilds(pr).length, 2);
   assert.equal(canRerunGate(pr), true);
   assert.equal(canRerunGate({ pipeline: { builds: [{ status: 'running' }] } }), false);
+});
+
+test('default time zone is IST until changed', () => {
+  assert.equal(DEFAULT_TIME_ZONE, 'Asia/Kolkata');
+  assert.equal(getTimeZone(), 'Asia/Kolkata');
+});
+
+test('setTimeZone changes how fmtDate/fmtDateShort render an instant', () => {
+  // A fixed UTC instant: 2024-01-01T00:30:00Z. In IST (+5:30) this is 06:00 on
+  // Jan 1; in US Pacific (-8) it is 16:30 on Dec 31 — so the calendar day differs.
+  const iso = '2024-01-01T00:30:00.000Z';
+
+  setTimeZone('Asia/Kolkata');
+  const istDate = fmtDate(iso);
+  const istDay = fmtDateShort(iso);
+  assert.match(istDate, /2024/);
+  assert.match(istDay, /Jan 1, 2024/); // still Jan 1 in IST
+
+  setTimeZone('America/Los_Angeles');
+  const pstDay = fmtDateShort(iso);
+  assert.match(pstDay, /Dec 31, 2023/); // rolled back a day in PST
+  assert.notEqual(fmtDate(iso), istDate); // time-of-day differs from IST
+
+  setTimeZone('Asia/Kolkata'); // restore default for other tests
+});
+
+test('setTimeZone ignores invalid zones (keeps the previous one)', () => {
+  setTimeZone('Asia/Kolkata');
+  setTimeZone('Not/AZone');
+  assert.equal(getTimeZone(), 'Asia/Kolkata');
+  setTimeZone('');
+  assert.equal(getTimeZone(), 'Asia/Kolkata');
+});
+
+test('fmtDate/fmtDateShort return empty string for falsy input', () => {
+  assert.equal(fmtDate(''), '');
+  assert.equal(fmtDateShort(null), '');
 });

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import { getTimeZone } from '../lib/format.js';
 import { useAsync } from '../lib/useAsync.js';
 import { Loading, ErrorBox, useToast, RefreshingTag } from '../components/ui.jsx';
 import { MachineGroup } from '../components/MachineGroup.jsx';
@@ -70,7 +71,7 @@ export function CopilotSessions() {
       const [g, o, a] = await Promise.all([
         api.agentSessionsGrouped(),
         api.agentOverview(),
-        api.agentAnalytics().catch(() => null),
+        api.agentAnalytics(getTimeZone()).catch(() => null),
       ]);
       return { groups: g.value || [], overview: o, analytics: a };
     },

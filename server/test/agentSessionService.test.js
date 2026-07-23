@@ -178,3 +178,32 @@ test('getOverview is safe with no sessions', () => {
   assert.equal(o.longestRunning, null);
   assert.equal(o.lastActivityAgo, null);
 });
+
+test('getAnalytics buckets busiest hour + day in the requested time zone', () => {
+  const U = 'tz-analytics-user';
+  svc.heartbeat(U, { machineId: 'm', sessionId: 's', status: 'active' });
+  const start = new Date(svc.getSessions(U)[0].startTime);
+  for (const tz of ['UTC', 'Asia/Kolkata', 'America/New_York']) {
+    const a = svc.getAnalytics(U, { tz });
+    assert.equal(a.timezone, tz, 'echoes the requested zone');
+    const expectedHour = Number(
+      new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(start)
+    ) % 24;
+    const hourBucket = a.byHour.find((h) => h.count > 0);
+    assert.ok(hourBucket, 'one hour bucket is populated');
+    assert.equal(hourBucket.hour, expectedHour, `hour bucket matches ${tz}`);
+    const expectedDay = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(start);
+    assert.equal(a.byDay[0].day, expectedDay, `day bucket matches ${tz}`);
+  }
+});
+
+test('getAnalytics falls back gracefully for an invalid time zone', () => {
+  const U = 'tz-analytics-bad';
+  svc.heartbeat(U, { machineId: 'm', sessionId: 's', status: 'active' });
+  const a = svc.getAnalytics(U, { tz: 'Not/AZone' });
+  // Never throws; still returns 24 hour buckets with exactly one populated.
+  assert.equal(a.byHour.length, 24);
+  assert.equal(a.byHour.filter((h) => h.count > 0).length, 1);
+});

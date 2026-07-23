@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { AppContext } from './lib/AppContext.jsx';
 import { api } from './lib/api.js';
 import { cacheClear } from './lib/dataCache.js';
+import { setTimeZone, getTimeZone, DEFAULT_TIME_ZONE } from './lib/format.js';
 import { ToastProvider, Loading, ErrorBox } from './components/ui.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { Layout } from './components/Layout.jsx';
@@ -50,6 +51,9 @@ export default function App() {
         return;
       }
       const cfg = await api.config();
+      // Apply the user's time zone before the first dashboard render so every
+      // absolute date/time is formatted in the chosen zone from the start.
+      setTimeZone(cfg.uiPrefs?.timezone || DEFAULT_TIME_ZONE);
       setUser(me.user || cfg.me);
       setConfig(cfg);
       setPhase('ready');
@@ -61,7 +65,13 @@ export default function App() {
 
   const reloadConfig = useCallback(async () => {
     const cfg = await api.config();
+    // If the time zone changed, apply it and remount the routed views (bump
+    // epoch) so every already-rendered timestamp reformats immediately.
+    const nextTz = cfg.uiPrefs?.timezone || DEFAULT_TIME_ZONE;
+    const tzChanged = getTimeZone() !== nextTz;
+    setTimeZone(nextTz);
     setConfig(cfg);
+    if (tzChanged) setEpoch((n) => n + 1);
     return cfg;
   }, []);
 

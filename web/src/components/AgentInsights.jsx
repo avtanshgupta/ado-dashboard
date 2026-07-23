@@ -38,7 +38,7 @@ function ActivityChart({ data, interval = 0, labelFormatter, height = 150 }) {
 /** Usage analytics for the Agents "Insights" tab. */
 export function AgentInsights({ data }) {
   if (!data) return null;
-  const { totalSessions, agentHours, perMachine = [], byHour = [], byDay = [], perRepo = [] } = data;
+  const { totalSessions, agentHours, perMachine = [], byHour = [], byDay = [], perRepo = [], timezone } = data;
   const hourItems = byHour.map((h) => ({ label: String(h.hour).padStart(2, '0'), count: h.count }));
   const dayItems = byDay.map((d) => ({ label: d.day.slice(5), count: d.count }));
 
@@ -52,8 +52,8 @@ export function AgentInsights({ data }) {
 
       <div className="overview-detail">
         <div className="ov-card">
-          <h4>Busiest hours (session starts, UTC)</h4>
-          {byHour.some((h) => h.count) ? <ActivityChart data={hourItems} interval={2} labelFormatter={(l) => `${l}:00 UTC`} /> : <p className="muted" style={{ fontSize: 13, margin: 0 }}>No data yet.</p>}
+          <h4>Busiest hours (session starts{timezone ? ` · ${timezone}` : ''})</h4>
+          {byHour.some((h) => h.count) ? <ActivityChart data={hourItems} interval={2} labelFormatter={(l) => `${l}:00`} /> : <p className="muted" style={{ fontSize: 13, margin: 0 }}>No data yet.</p>}
         </div>
         <div className="ov-card">
           <h4><FolderGit2 size={13} /> Sessions by repository</h4>
