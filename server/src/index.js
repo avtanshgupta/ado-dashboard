@@ -10,6 +10,8 @@ import agentsRouter, { heartbeatRouter } from './routes/agents.js';
 import { sessionContext, warmIdentity } from './middleware/sessionContext.js';
 import { csrfGuard } from './middleware/csrf.js';
 import { securityHeaders } from './middleware/securityHeaders.js';
+import { auditLogger } from './middleware/auditLog.js';
+import { createRateLimit } from './middleware/rateLimit.js';
 
 // Prefer IPv4 in DNS resolution — some networks (incl. local dev machines) time
 // out on IPv6 routes to dev.azure.com/*.visualstudio.com, which surfaces as
@@ -50,6 +52,13 @@ app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
+// Defensive rate limit on state-changing API calls (B1): blunts runaway loops
+// and abuse without throttling normal browsing. GETs are unaffected; the ceiling
+// is generous enough for bulk actions across many selected PRs.
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const mutationLimiter = createRateLimit({ windowMs: 60_000, max: 300, name: 'api-mutation' });
+const mutationGuard = (req, res, next) => (SAFE_METHODS.has(req.method) ? next() : mutationLimiter(req, res, next));
+
 // Auth endpoints are public (they establish or refresh the session) and are
 // intentionally exempt from the CSRF header check (the token authorizes them).
 app.use('/api/auth', authRouter);
@@ -61,11 +70,11 @@ app.use('/api/auth', authRouter);
 app.use('/api/agents/heartbeat', csrfGuard, heartbeatRouter);
 
 // Every /api request runs in an authenticated session context, and any
-// state-changing call must carry the CSRF header.
-app.use('/api', csrfGuard, sessionContext, apiRouter);
+// state-changing call must carry the CSRF header, is rate-limited, and audited.
+app.use('/api', csrfGuard, mutationGuard, sessionContext, auditLogger, apiRouter);
 
-// Agent session routes (also behind session context + CSRF).
-app.use('/api/agents', csrfGuard, sessionContext, agentsRouter);
+// Agent session routes (also behind session context + CSRF + limit + audit).
+app.use('/api/agents', csrfGuard, mutationGuard, sessionContext, auditLogger, agentsRouter);
 
 // Serve the built frontend when present (production / single-process mode).
 const webDist = join(config.serverRoot, '..', 'web', 'dist');

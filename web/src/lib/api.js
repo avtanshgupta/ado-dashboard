@@ -41,6 +41,7 @@ export const api = {
   // config (per-user)
   config: () => req('/config'),
   updateConfig: (patch) => req('/config', { method: 'PUT', body: patch }),
+  audit: (limit = 100) => req(`/audit?limit=${limit}`),
   projects: () => req('/projects'),
   repoResolve: (ref) => req(`/repos/resolve?ref=${encodeURIComponent(ref)}`),
   projectResolve: (ref) => req(`/projects/resolve?ref=${encodeURIComponent(ref)}`),

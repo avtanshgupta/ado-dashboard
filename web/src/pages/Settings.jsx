@@ -139,6 +139,7 @@ export function Settings() {
   const [plNames, setPlNames] = useState({}); // definitionId -> name (for display)
   const [prefs, setPrefs] = useState(config.notificationPrefs || {});
   const [templates, setTemplates] = useState(config.commentTemplates || []); // A4
+  const [audit, setAudit] = useState(null); // B2 — recent state-changing actions
   const [slaDays, setSlaDays] = useState(config.slaDays || 7); // B4
   const [density, setDensity] = useState(config.uiPrefs?.density || 'comfortable'); // E5
   const [agents, setAgents] = useState(config.agents || {}); // Copilot agent session thresholds
@@ -172,6 +173,13 @@ export function Settings() {
     []
   );
   useEffect(() => { loadKeys(); }, [loadKeys]);
+
+  // B2 — load the user's own recent audit trail once (shown under Account).
+  useEffect(() => {
+    let stop = false;
+    api.audit(50).then((r) => { if (!stop) setAudit(r.value || []); }).catch(() => { if (!stop) setAudit([]); });
+    return () => { stop = true; };
+  }, []);
 
   function downloadFile(filename, text, type = 'application/octet-stream') {
     const url = URL.createObjectURL(new Blob([text], { type }));
@@ -769,6 +777,30 @@ mv ~/Downloads/copilot-session-reporter.py ~/
               <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>
                 You act with your own Azure DevOps permissions. Settings on this page are personal to you.
               </div>
+            </div>
+          )}
+
+          {section === 'account' && (
+            <div className="card card-pad" style={{ marginTop: 16 }}>
+              <h3 className="settings-section-head">Recent activity</h3>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                Your most recent state-changing actions (merges, votes, comments, edits). Recorded
+                locally for your own traceability — no comment text or tokens are stored.
+              </div>
+              {audit == null && <div className="muted" style={{ fontSize: 13 }}>Loading…</div>}
+              {audit != null && audit.length === 0 && <div className="muted" style={{ fontSize: 13 }}>No recorded actions yet.</div>}
+              {audit != null && audit.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 320, overflowY: 'auto' }}>
+                  {audit.map((a, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, padding: '4px 0', borderBottom: '1px solid var(--border-muted)' }}>
+                      <span className="badge" style={{ minWidth: 46, textAlign: 'center' }}>{a.method}</span>
+                      <span style={{ color: a.ok ? 'var(--ok, inherit)' : 'var(--danger, #c00)', fontWeight: 600, minWidth: 34 }}>{a.status}</span>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--mono, monospace)' }} title={a.path}>{a.path}</span>
+                      <span className="muted" style={{ whiteSpace: 'nowrap' }}>{a.t ? new Date(a.t).toLocaleString() : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

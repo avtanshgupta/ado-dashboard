@@ -20,6 +20,7 @@ import { poll, getNotifications, markRead } from '../services/notificationsServi
 import { sseHandler } from '../services/streamService.js';
 import { standupMarkdown, standupIcs } from '../lib/standup.js';
 import { getState, addFollow, removeFollow, setSnooze, clearSnooze, setDismiss, clearDismiss } from '../lib/userState.js';
+import { readAudit } from '../lib/auditLog.js';
 import { resolveGroup, searchIdentities } from '../services/identityService.js';
 import { resolveRepoLink, resolveProjectLink } from '../services/projectService.js';
 import { getPrDiffFiles, getPrFileDiff } from '../services/diffService.js';
@@ -402,6 +403,12 @@ router.put(
 router.post('/refresh', wrap(async (_req, res) => {
   clearCache();
   res.json({ ok: true });
+}));
+
+// ---- audit log (B2): the signed-in user's own recent state-changing actions ----
+router.get('/audit', wrap(async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 100, 500);
+  res.json({ value: readAudit(currentUser().id, { limit }) });
 }));
 
 // ---- CSV export ----
