@@ -1,23 +1,37 @@
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Clock, Server, FolderGit2, Activity } from './icons.jsx';
 
-function Bars({ items, labelKey, valueKey, maxLabels = 8 }) {
-  const max = Math.max(1, ...items.map((i) => i[valueKey]));
-  const step = Math.max(1, Math.ceil(items.length / maxLabels));
+const BAR_FILL = '#0969da';
+const BAR_FILL_ACTIVE = '#0a5cc0';
+
+/**
+ * Interactive activity histogram (recharts, matching the app's other charts):
+ * hover shows a themed tooltip and highlights the hovered bar. `interval` thins
+ * crowded x-axis labels; `labelFormatter` prettifies the tooltip header.
+ */
+function ActivityChart({ data, interval = 0, labelFormatter, height = 150 }) {
   return (
-    <div className="insight-chart">
-      <div className="insight-bars">
-        {items.map((it) => (
-          <div className="ib-col" key={it[labelKey]} title={`${it[labelKey]}: ${it[valueKey]}`}>
-            <div className="ib-bar" style={{ height: `${Math.round((it[valueKey] / max) * 100)}%` }} />
-          </div>
-        ))}
-      </div>
-      <div className="insight-xaxis">
-        {items.map((it, i) => (
-          <span className="ib-label" key={it[labelKey]}>{i % step === 0 ? it[labelKey] : ''}</span>
-        ))}
-      </div>
-    </div>
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eaeef2" />
+        <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={interval} tickLine={false} />
+        <YAxis tick={{ fontSize: 12 }} allowDecimals={false} width={28} />
+        <Tooltip
+          cursor={{ fill: 'rgba(9, 105, 218, 0.08)' }}
+          labelFormatter={labelFormatter}
+          formatter={(v) => [v, v === 1 ? 'session' : 'sessions']}
+        />
+        <Bar
+          dataKey="count"
+          name="Sessions"
+          fill={BAR_FILL}
+          activeBar={{ fill: BAR_FILL_ACTIVE }}
+          radius={[3, 3, 0, 0]}
+          maxBarSize={38}
+          isAnimationActive={false}
+        />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -39,7 +53,7 @@ export function AgentInsights({ data }) {
       <div className="overview-detail">
         <div className="ov-card">
           <h4>Busiest hours (session starts, UTC)</h4>
-          {byHour.some((h) => h.count) ? <Bars items={hourItems} labelKey="label" valueKey="count" maxLabels={8} /> : <p className="muted" style={{ fontSize: 13, margin: 0 }}>No data yet.</p>}
+          {byHour.some((h) => h.count) ? <ActivityChart data={hourItems} interval={2} labelFormatter={(l) => `${l}:00 UTC`} /> : <p className="muted" style={{ fontSize: 13, margin: 0 }}>No data yet.</p>}
         </div>
         <div className="ov-card">
           <h4><FolderGit2 size={13} /> Sessions by repository</h4>
@@ -55,7 +69,7 @@ export function AgentInsights({ data }) {
 
       <div className="ov-card" style={{ marginTop: 12 }}>
         <h4>Daily activity (sessions started)</h4>
-        {dayItems.length ? <Bars items={dayItems} labelKey="label" valueKey="count" maxLabels={14} /> : <p className="muted" style={{ fontSize: 13, margin: 0 }}>No data yet.</p>}
+        {dayItems.length ? <ActivityChart data={dayItems} interval={dayItems.length > 10 ? 1 : 0} labelFormatter={(l) => l} /> : <p className="muted" style={{ fontSize: 13, margin: 0 }}>No data yet.</p>}
       </div>
 
       <div className="ov-card" style={{ marginTop: 12 }}>
