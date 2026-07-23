@@ -135,7 +135,7 @@ ado-pr-dashboard/
 │   │   ├── index.js              # app bootstrap; serves web/dist in production
 │   │   ├── config.js             # .env + app.config.json loader
 │   │   ├── routes/               # api.js, auth.js
-│   │   ├── middleware/           # sessionContext, csrf, rateLimit, securityHeaders
+│   │   ├── middleware/           # sessionContext, csrf, rateLimit, securityHeaders, auditLog
 │   │   ├── services/             # pr, pipeline, workItem, notifications, stream, …
 │   │   └── lib/                  # adoClient, userConfig, crypto, analytics, links, …
 │   ├── config/app.config.json    # org defaults & per-user seeds
@@ -234,8 +234,12 @@ persists to `server/data/users/<your-id>.json`:
 - **Work-item saved queries** — add by pasting a query link; run them under
   *Work Items → Queries*. (All work items under monitored projects are tracked
   automatically — no area paths needed.)
-- **Default time window**, **SLA / aging thresholds**, **comment templates**,
-  **saved views**, **muted repos**, and notification preferences.
+- **Comment templates** (reusable reply snippets) and **PR description
+  templates** (prefill a new PR's description; optionally scoped per repository).
+- **Default time window**, **SLA / aging thresholds**, **saved views**,
+  **muted repos**, and notification preferences.
+- **Recent activity** — your own audit trail of state-changing actions (under
+  *Settings → Account*).
 
 > Added items (projects, repos, pipelines, queries, aliases) are **removable, not
 > editable** — remove and re-add to change one.
@@ -332,6 +336,7 @@ session context. Representative surface — see
 | --- | --- | --- |
 | GET/POST | `/api/auth/me · /login · /token · /logout` | Session bootstrap + token-paste sign-in (public) |
 | GET/PUT | `/api/config` | Per-user settings + identity (validated on write) |
+| GET | `/api/audit?limit=` | The signed-in user's recent state-changing actions (audit trail) |
 | POST/GET | `/api/resolve-group · /identities?query= · /repos/resolve · /projects/resolve · /pipelines/resolve` | Resolve an alias/repo/project/pipeline link |
 | GET | `/api/overview · /summary · /pr-analytics · /standup(.ics)` | Rollups, project summary, analytics, stand-up |
 | GET/POST | `/api/action-center · /snooze · /dismiss · /follows` | Prioritized inbox + follow / snooze / dismiss |
@@ -359,6 +364,10 @@ Business logic lives in pure, dependency-free libraries (`server/src/lib/*`,
 framework to install. Run a single suite with, e.g.,
 `node --test server/test/workItemQuery.test.js`.
 
+**CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs lint, tests,
+and the web build on every push/PR to `main`, plus an advisory (report-only)
+dependency-audit and secret scan.
+
 ---
 
 ## 🛡 Security
@@ -370,8 +379,12 @@ framework to install. Run a single suite with, e.g.,
   custom-header pattern); browsers can't set it cross-origin without a CORS preflight.
 - **Headers:** CSP, `X-Content-Type-Options`, frame-deny, and HSTS-when-secure on
   every response, including the served SPA.
-- **Rate limiting** on auth/token routes; **CORS** restricted to configured/localhost
-  origins (no wildcard).
+- **Rate limiting** on auth/token routes and on **all state-changing `/api` calls**
+  (a generous per-IP ceiling that blunts runaway loops without throttling browsing);
+  **CORS** restricted to configured/localhost origins (no wildcard).
+- **Audit log:** every state-changing request is recorded to an append-only,
+  per-user JSONL trail (method, route, status, latency — **no** tokens, bodies, or
+  comment text) and surfaced under *Settings → Account → Recent activity*.
 - **Sessions** carry a TTL and rotate their `sid` on re-auth; vault tokens are
   encrypted at rest with **AES-256-GCM**.
 - **Access gate** re-checks MDE Linux group membership on every `/api` request.
