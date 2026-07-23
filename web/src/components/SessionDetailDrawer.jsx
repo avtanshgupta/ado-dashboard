@@ -12,12 +12,24 @@ function fmtTime(ts) {
   }
 }
 
+function fmtSeconds(seconds) {
+  const n = Number(seconds);
+  if (!Number.isFinite(n)) return '';
+  if (n < 60) return `${Math.round(n)}s`;
+  if (n < 3600) return `${Math.round(n / 60)}m`;
+  const h = Math.floor(n / 3600);
+  const m = Math.round((n % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
 /** Right-hand slide-over showing everything known about a single agent session. */
 export function SessionDetailDrawer({ session, machineName, onClose, onEnd }) {
   if (!session) return null;
   const { id, sessionId, status, repo, branch, cwd, agentType, startTime, lastHeartbeat, runtime, lastHeartbeatAgo, heartbeatCount, longRunning, metadata, history } = session;
   const meta = metadata || {};
   const hist = Array.isArray(history) ? [...history].reverse() : [];
+  const uptime = fmtSeconds(meta.uptimeSec);
+  const hasMetrics = uptime || meta.paneCount || meta.agentCount;
 
   return (
     <div className="drawer-root" role="dialog" aria-modal="true" aria-label="Session details">
@@ -62,6 +74,15 @@ export function SessionDetailDrawer({ session, machineName, onClose, onEnd }) {
               {meta.model && <div className="dkv"><span>Model</span><span>{meta.model}</span></div>}
               {meta.os && <div className="dkv"><span>OS</span><span>{meta.os}</span></div>}
               {meta.pid && <div className="dkv"><span>PID</span><span>{meta.pid}</span></div>}
+            </section>
+          )}
+
+          {hasMetrics && (
+            <section className="drawer-section">
+              <h4>Reporter metrics</h4>
+              {uptime && <div className="dkv"><span>Process uptime</span><span>{uptime}</span></div>}
+              {meta.agentCount && <div className="dkv"><span>Agents detected</span><span>{meta.agentCount}</span></div>}
+              {meta.paneCount && <div className="dkv"><span>Tmux panes</span><span>{meta.paneCount}</span></div>}
             </section>
           )}
 

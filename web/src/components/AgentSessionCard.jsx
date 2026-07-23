@@ -22,6 +22,14 @@ function runtime(start) {
   return `${mins}m`;
 }
 
+function shortSeconds(seconds) {
+  const n = Number(seconds);
+  if (!Number.isFinite(n)) return '';
+  if (n < 60) return `${Math.round(n)}s`;
+  if (n < 3600) return `${Math.round(n / 60)}m`;
+  return `${Math.floor(n / 3600)}h`;
+}
+
 const STATUS_COLORS = {
   active: '#22c55e',
   idle: '#eab308',
@@ -32,6 +40,7 @@ const STATUS_COLORS = {
 export function AgentSessionCard({ session, onEnd, onOpen, prMatch }) {
   const { id, repo, branch, cwd, status, lastHeartbeat, startTime, agentType, sessionId, longRunning, metadata } = session;
   const meta = metadata || {};
+  const uptime = shortSeconds(meta.uptimeSec);
 
   return (
     <div className={`agent-session-card status-${status}${longRunning ? ' long-running' : ''}`}>
@@ -74,12 +83,15 @@ export function AgentSessionCard({ session, onEnd, onOpen, prMatch }) {
           <span className="detail runtime">⏱ {runtime(startTime)}</span>
         )}
       </div>
-      {(meta.version || meta.os || meta.pid || meta.model) && (
+      {(meta.version || meta.os || meta.pid || meta.model || uptime || meta.agentCount || meta.paneCount) && (
         <div className="session-meta">
           {meta.version && <span className="meta-chip" title={meta.version}>v{cleanVersion(meta.version)}</span>}
           {meta.model && <span className="meta-chip">{meta.model}</span>}
           {meta.os && <span className="meta-chip">{meta.os}</span>}
           {meta.pid && <span className="meta-chip">pid {meta.pid}</span>}
+          {uptime && <span className="meta-chip">up {uptime}</span>}
+          {meta.agentCount && <span className="meta-chip">{meta.agentCount} agent{Number(meta.agentCount) === 1 ? '' : 's'}</span>}
+          {meta.paneCount && <span className="meta-chip">{meta.paneCount} pane{Number(meta.paneCount) === 1 ? '' : 's'}</span>}
         </div>
       )}
     </div>

@@ -1,11 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import os from 'node:os';
-import { join } from 'node:path';
-import { mkdtempSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { mkdirSync, rmSync } from 'node:fs';
 
 // Point per-user state at a throwaway dir before importing (module reads config).
-process.env.DATA_DIR = mkdtempSync(join(os.tmpdir(), 'ado-agentsvc-'));
+const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '.test-data', `agentSessionService-${process.pid}`);
+rmSync(DATA_DIR, { recursive: true, force: true });
+mkdirSync(DATA_DIR, { recursive: true });
+process.env.DATA_DIR = DATA_DIR;
 
 const svc = await import('../src/services/agentSessionService.js');
 
@@ -74,6 +77,41 @@ test('heartbeat merges metadata, counts beats, and records status transitions', 
   assert.equal(s.heartbeatCount, 2);
   assert.deepEqual(s.metadata, { version: '1.2.3', pid: '42' }); // merged
   assert.deepEqual(s.history.map((h) => h.status), ['active', 'idle']); // transition recorded
+});
+
+test('heartbeat status ended closes an existing live session and records history', () => {
+  const U = 'ended-heartbeat-user';
+  svc.heartbeat(U, { machineId: 'm', sessionId: 's', status: 'active', metadata: { version: '1.2.3' } });
+  svc.heartbeat(U, { machineId: 'm', sessionId: 's', status: 'ended', metadata: { endedByReporter: true } });
+  const s = svc.getSessions(U)[0];
+  assert.equal(s.status, 'ended');
+  assert.equal(s.heartbeatCount, 2);
+  assert.deepEqual(s.history.map((h) => h.status), ['active', 'ended']);
+  assert.deepEqual(s.metadata, { version: '1.2.3', endedByReporter: true });
+});
+
+test('heartbeat preserves and merges optional safe reporter metrics', () => {
+  const U = 'optional-metrics-user';
+  svc.heartbeat(U, {
+    machineId: 'm',
+    sessionId: 's',
+    status: 'active',
+    metadata: { version: '1.2.3', uptimeSec: 90, agentCount: 2 },
+  });
+  svc.heartbeat(U, {
+    machineId: 'm',
+    sessionId: 's',
+    status: 'active',
+    metadata: { paneCount: 4, collector: 'tmux' },
+  });
+  const s = svc.getSessions(U)[0];
+  assert.deepEqual(s.metadata, {
+    version: '1.2.3',
+    uptimeSec: 90,
+    agentCount: 2,
+    paneCount: 4,
+    collector: 'tmux',
+  });
 });
 
 test('getSessionById returns an enriched session or null', () => {
