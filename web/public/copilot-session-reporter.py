@@ -234,9 +234,13 @@ def collect_tmux_sessions():
     output = run_cmd(["tmux", "list-sessions", "-F", "#{session_name}"])
     tmux_sessions = [s.strip() for s in output.splitlines() if s.strip()]
     for tmux_session in tmux_sessions:
+        # `-s` lists panes across ALL windows in the session (without it, tmux
+        # only returns the session's active window, missing a Copilot running in
+        # a background window).
         panes = run_cmd([
             "tmux",
             "list-panes",
+            "-s",
             "-t",
             tmux_session,
             "-F",
@@ -352,27 +356,30 @@ def collect_bare_windows_sessions():
 
 
 def dedupe_sessions(sessions):
-    """De-duplicate by session identity, then by cwd for overlapping collectors."""
-    by_key = {}
-    by_cwd = {}
+    """De-duplicate only genuinely-identical sessions across overlapping collectors.
+
+    Identity is the underlying Copilot process id — the sole reliable unique key.
+    Two agents running in the SAME directory are still distinct sessions, so we
+    must NOT collapse by cwd (that previously dropped real sessions that merely
+    shared a working directory). Fall back to (sessionId, cwd) only when a pid is
+    unavailable, so distinct tmux sessions are still preserved by their name.
+    """
+    result = []
+    seen_pids = set()
+    seen_fallback = set()
     for session in sessions:
-        sid = session.get("sessionId") or ""
-        cwd = session.get("cwd") or ""
-        key = (sid, cwd)
-        if key in by_key:
-            continue
-        if cwd and cwd in by_cwd:
-            existing = by_cwd[cwd]
-            existing_meta = existing.setdefault("metadata", {})
-            existing_meta["agentCount"] = max(
-                int(existing_meta.get("agentCount") or 1),
-                int((session.get("metadata") or {}).get("agentCount") or 1),
-            )
-            continue
-        by_key[key] = session
-        if cwd:
-            by_cwd[cwd] = session
-    return list(by_key.values())
+        pid = str((session.get("metadata") or {}).get("pid") or "").strip()
+        if pid:
+            if pid in seen_pids:
+                continue
+            seen_pids.add(pid)
+        else:
+            fallback = (session.get("sessionId") or "", session.get("cwd") or "")
+            if fallback in seen_fallback:
+                continue
+            seen_fallback.add(fallback)
+        result.append(session)
+    return result
 
 
 def detect_copilot_sessions():
