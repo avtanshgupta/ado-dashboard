@@ -70,6 +70,7 @@ function seed() {
     pipelines: defaults.pipelines.map((p) => ({ ...p })),
     notificationPrefs: { ...DEFAULT_NOTIF_PREFS },
     commentTemplates: [], // A4
+    prTemplates: [], // C1 — PR description templates ({ id, name, body, repo? })
     savedViews: [], // E1
     mutedRepos: [], // C4
     uiPrefs: { ...DEFAULT_UI_PREFS }, // E5
@@ -137,6 +138,7 @@ export function loadUserConfig(userId) {
     pipelines: stored.pipelines || defaults.pipelines.map((p) => ({ ...p })),
     notificationPrefs: { ...DEFAULT_NOTIF_PREFS, ...(stored.notificationPrefs || {}) },
     commentTemplates: Array.isArray(stored.commentTemplates) ? stored.commentTemplates : [],
+    prTemplates: Array.isArray(stored.prTemplates) ? stored.prTemplates : [],
     savedViews: Array.isArray(stored.savedViews) ? stored.savedViews : [],
     mutedRepos: Array.isArray(stored.mutedRepos) ? stored.mutedRepos : [],
     uiPrefs: { ...DEFAULT_UI_PREFS, ...(stored.uiPrefs || {}) },
@@ -148,7 +150,7 @@ export function loadUserConfig(userId) {
 
 const ALLOWED_KEYS = [
   'projects', 'repositories', 'repoProjects', 'team', 'reviewerGroups', 'defaultTimeRangeMonths', 'pipelines', 'notificationPrefs',
-  'commentTemplates', 'savedViews', 'mutedRepos', 'uiPrefs', 'slaDays',
+  'commentTemplates', 'prTemplates', 'savedViews', 'mutedRepos', 'uiPrefs', 'slaDays',
   'workItemSavedQueries', 'agents',
 ];
 
@@ -257,6 +259,7 @@ function validateAndNormalize(partial) {
   }
 
   if (partial.commentTemplates !== undefined) clean.commentTemplates = validateTemplates(partial.commentTemplates);
+  if (partial.prTemplates !== undefined) clean.prTemplates = validatePrTemplates(partial.prTemplates);
   if (partial.savedViews !== undefined) clean.savedViews = validateSavedViews(partial.savedViews);
   if (partial.mutedRepos !== undefined) clean.mutedRepos = asStringArray(partial.mutedRepos, 'mutedRepos');
 
@@ -320,6 +323,25 @@ function validateTemplates(val) {
       id: typeof t.id === 'string' && t.id.trim() ? t.id.trim() : rid(),
       name: requireString(t.name, `commentTemplates[${i}].name`, { max: 120 }),
       body: requireString(t.body, `commentTemplates[${i}].body`, { max: 8000 }),
+    };
+  });
+}
+
+/**
+ * C1 — PR description templates: [{ id, name, body, repo? }]. An optional `repo`
+ * (case-insensitive name) scopes a template so the create-PR form can suggest it
+ * automatically for that repository; templates without a repo apply everywhere.
+ */
+function validatePrTemplates(val) {
+  if (!Array.isArray(val)) throw badRequest('prTemplates must be an array.');
+  if (val.length > 100) throw badRequest('Too many PR templates (max 100).');
+  return val.map((t, i) => {
+    if (!t || typeof t !== 'object') throw badRequest(`prTemplates[${i}] must be an object.`);
+    return {
+      id: typeof t.id === 'string' && t.id.trim() ? t.id.trim() : rid(),
+      name: requireString(t.name, `prTemplates[${i}].name`, { max: 120 }),
+      body: requireString(t.body, `prTemplates[${i}].body`, { max: 8000 }),
+      ...(typeof t.repo === 'string' && t.repo.trim() ? { repo: t.repo.trim().toLowerCase() } : {}),
     };
   });
 }
@@ -450,6 +472,7 @@ export function effectiveConfig(user) {
     pipelines,
     notificationPrefs: uc.notificationPrefs,
     commentTemplates: uc.commentTemplates || [],
+    prTemplates: uc.prTemplates || [],
     savedViews: uc.savedViews || [],
     mutedRepos: uc.mutedRepos || [],
     mutedRepoSet: new Set((uc.mutedRepos || []).map((r) => r.toLowerCase())),

@@ -139,6 +139,7 @@ export function Settings() {
   const [plNames, setPlNames] = useState({}); // definitionId -> name (for display)
   const [prefs, setPrefs] = useState(config.notificationPrefs || {});
   const [templates, setTemplates] = useState(config.commentTemplates || []); // A4
+  const [prTemplates, setPrTemplates] = useState(config.prTemplates || []); // C1
   const [audit, setAudit] = useState(null); // B2 — recent state-changing actions
   const [slaDays, setSlaDays] = useState(config.slaDays || 7); // B4
   const [density, setDensity] = useState(config.uiPrefs?.density || 'comfortable'); // E5
@@ -369,6 +370,9 @@ export function Settings() {
         pipelines,
         notificationPrefs: prefs,
         commentTemplates: templates.filter((t) => t.name.trim() && t.body.trim()),
+        prTemplates: prTemplates
+          .filter((t) => t.name.trim() && t.body.trim())
+          .map((t) => ({ id: t.id, name: t.name, body: t.body, ...(t.repo ? { repo: t.repo } : {}) })),
         slaDays: Number(slaDays),
         uiPrefs: { density },
         workItemSavedQueries: wiQueries.filter((q) => (q.id || '').trim()),
@@ -386,7 +390,7 @@ export function Settings() {
   const SECTIONS = [
     { id: 'general', label: 'General', Icon: SlidersHorizontal },
     { id: 'team', label: 'Team & Reviewers', Icon: Users },
-    { id: 'templates', label: 'Comment templates', Icon: MessageSquare },
+    { id: 'templates', label: 'Templates', Icon: MessageSquare },
     { id: 'workitems', label: 'Work Items', Icon: ClipboardList },
     { id: 'pipelines', label: 'Pipelines', Icon: Workflow },
     { id: 'agents', label: 'Agents', Icon: Bot },
@@ -659,6 +663,46 @@ export function Settings() {
                 </div>
               ))}
               <button className="btn sm accent" onClick={() => setTemplates([...templates, { id: `t${Date.now()}`, name: '', body: '' }])}>+ Add template</button>
+            </div>
+          )}
+
+          {section === 'templates' && (
+            <div className="card card-pad" style={{ marginTop: 16 }}>
+              <h3 className="settings-section-head">PR description templates ({prTemplates.length})</h3>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                Prefill the description when opening a new pull request. Scope a template to one
+                repository, or leave it on “All repositories” to offer it everywhere.
+              </div>
+              {prTemplates.map((t, i) => (
+                <div key={t.id || i} className="tmpl-edit" style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border-muted)' }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                    <input
+                      value={t.name}
+                      onChange={(e) => { const n = [...prTemplates]; n[i] = { ...t, name: e.target.value }; setPrTemplates(n); }}
+                      placeholder="Template name"
+                      style={{ flex: 1, padding: '6px 9px', border: '1px solid var(--border)', borderRadius: 6 }}
+                    />
+                    <select
+                      value={t.repo || ''}
+                      aria-label="Template repository scope"
+                      onChange={(e) => { const n = [...prTemplates]; n[i] = { ...t, repo: e.target.value.toLowerCase() }; setPrTemplates(n); }}
+                      style={{ padding: '6px 9px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13 }}
+                    >
+                      <option value="">All repositories</option>
+                      {(repos || []).map((r) => <option key={r} value={r.toLowerCase()}>{r}</option>)}
+                    </select>
+                    <button className="btn sm" onClick={() => setPrTemplates(prTemplates.filter((_, j) => j !== i))}>Remove</button>
+                  </div>
+                  <textarea
+                    value={t.body}
+                    onChange={(e) => { const n = [...prTemplates]; n[i] = { ...t, body: e.target.value }; setPrTemplates(n); }}
+                    placeholder="Template body (Markdown supported)"
+                    rows={3}
+                    style={{ width: '100%', padding: '6px 9px', border: '1px solid var(--border)', borderRadius: 6, resize: 'vertical', fontSize: 13 }}
+                  />
+                </div>
+              ))}
+              <button className="btn sm accent" onClick={() => setPrTemplates([...prTemplates, { id: `p${Date.now()}`, name: '', body: '', repo: '' }])}>+ Add PR template</button>
             </div>
           )}
 

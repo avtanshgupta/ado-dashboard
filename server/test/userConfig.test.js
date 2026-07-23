@@ -34,6 +34,29 @@ test('rejects a template missing a body', () => {
   assert.throws(() => saveUserConfig(UID, { commentTemplates: [{ name: 'x' }] }), /body (is required|must be a string)/);
 });
 
+test('fresh config seeds an empty prTemplates list', () => {
+  const c = loadUserConfig('pr-tmpl-fresh');
+  assert.deepEqual(c.prTemplates, []);
+});
+
+test('saves and normalizes PR templates (assigns ids, lowercases repo)', () => {
+  const saved = saveUserConfig('pr-tmpl-user', {
+    prTemplates: [
+      { name: '  Bugfix ', body: '## Summary\n' },
+      { name: 'Feature', body: '## What & why', repo: 'WD.Client.Linux' },
+    ],
+  });
+  assert.equal(saved.prTemplates.length, 2);
+  assert.equal(saved.prTemplates[0].name, 'Bugfix');
+  assert.match(saved.prTemplates[0].id, /^[a-z0-9]+$/);
+  assert.equal(saved.prTemplates[0].repo, undefined, 'no repo → applies everywhere');
+  assert.equal(saved.prTemplates[1].repo, 'wd.client.linux', 'repo scope is lowercased');
+});
+
+test('rejects a PR template missing a body', () => {
+  assert.throws(() => saveUserConfig('pr-tmpl-user', { prTemplates: [{ name: 'x' }] }), /body (is required|must be a string)/);
+});
+
 test('notification prefs coerce to booleans and ignore unknown keys', () => {
   const ok = saveUserConfig(UID, { notificationPrefs: { newPr: 'yes', bogus: true } });
   assert.equal(ok.notificationPrefs.newPr, true);

@@ -78,6 +78,19 @@ export function CreatePr() {
   const [reviewers, setReviewers] = useState([]);
   const [busy, setBusy] = useState(false);
 
+  // C1 — PR description templates. Repo-scoped templates are offered first, then
+  // any that apply everywhere (no repo). Picking one fills the description box.
+  const allTemplates = config.prTemplates || [];
+  const repoLower = repo.toLowerCase();
+  const templates = allTemplates
+    .filter((t) => !t.repo || t.repo === repoLower)
+    .sort((a, b) => (b.repo === repoLower ? 1 : 0) - (a.repo === repoLower ? 1 : 0));
+
+  function applyTemplate(id) {
+    const t = templates.find((x) => x.id === id);
+    if (t) setDescription(t.body);
+  }
+
   useEffect(() => {
     if (!repo) return undefined;
     let stop = false;
@@ -150,7 +163,22 @@ export function CreatePr() {
         <label className="form-label">Title</label>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Descriptive PR title" style={{ ...fieldStyle, marginBottom: 14 }} />
 
-        <label className="form-label">Description (Markdown)</label>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <label className="form-label">Description (Markdown)</label>
+          {templates.length > 0 && (
+            <select
+              aria-label="Insert PR description template"
+              defaultValue=""
+              onChange={(e) => { applyTemplate(e.target.value); e.target.value = ''; }}
+              style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+            >
+              <option value="" disabled>Insert template…</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}{t.repo ? ` (${t.repo})` : ''}</option>
+              ))}
+            </select>
+          )}
+        </div>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} placeholder="What does this PR do?" style={{ ...fieldStyle, marginBottom: 14, resize: 'vertical' }} />
 
         <label className="form-label">Reviewers</label>

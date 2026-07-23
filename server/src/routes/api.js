@@ -79,6 +79,7 @@ function buildConfigResponse(cfg) {
     pipelines: cfg.pipelines,
     notificationPrefs: cfg.notificationPrefs,
     commentTemplates: cfg.commentTemplates,
+    prTemplates: cfg.prTemplates,
     savedViews: cfg.savedViews,
     mutedRepos: cfg.mutedRepos,
     uiPrefs: cfg.uiPrefs,
