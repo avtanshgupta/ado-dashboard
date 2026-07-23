@@ -30,36 +30,67 @@ export const limit = createLimiter(config.fetchConcurrency || 8);
 
 // ---- short-TTL GET cache (scoped per user) ----
 const cache = new Map(); // key -> { value, expires }
+const userCounts = new Map(); // uid -> number of cached entries (for per-user fairness)
 const TTL = (config.cacheTtlSeconds || 45) * 1000;
 // Hard cap so the cache can't grow unbounded (e.g. many users / many URLs).
 // Map preserves insertion order, so eviction is FIFO once over the cap.
 const MAX_CACHE_ENTRIES = 5000;
+// No single user may hold more than this many entries, so one heavy user can't
+// evict everyone else's cache out from under them (A5).
+const MAX_PER_USER = 1500;
 
 function userKey(url) {
   const uid = currentUser()?.id || 'anon';
   return `${uid}::${url}`;
 }
+/** The owning user id encoded at the front of a cache key. */
+function uidOf(key) {
+  const i = key.indexOf('::');
+  return i === -1 ? 'anon' : key.slice(0, i);
+}
+/** Single deletion path so per-user counts stay in sync with the cache Map. */
+function cacheDelete(key) {
+  if (!cache.has(key)) return;
+  cache.delete(key);
+  const uid = uidOf(key);
+  const n = (userCounts.get(uid) || 1) - 1;
+  if (n <= 0) userCounts.delete(uid);
+  else userCounts.set(uid, n);
+}
+/** Evict a single user's oldest entry (first insertion-ordered key they own). */
+function evictOldestForUser(uid) {
+  for (const k of cache.keys()) {
+    if (uidOf(k) === uid) {
+      cacheDelete(k);
+      return;
+    }
+  }
+}
 function cacheGet(key) {
   const hit = cache.get(key);
   if (hit && hit.expires > Date.now()) return hit.value;
-  if (hit) cache.delete(key);
+  if (hit) cacheDelete(key);
   return undefined;
 }
 function cacheSet(key, value) {
   // Refresh insertion order on re-set so hot keys survive FIFO eviction.
-  if (cache.has(key)) cache.delete(key);
+  if (cache.has(key)) cacheDelete(key);
   cache.set(key, { value, expires: Date.now() + TTL });
+  const uid = uidOf(key);
+  userCounts.set(uid, (userCounts.get(uid) || 0) + 1);
+  // Per-user fairness cap first, then the global cap.
+  while ((userCounts.get(uid) || 0) > MAX_PER_USER) evictOldestForUser(uid);
   while (cache.size > MAX_CACHE_ENTRIES) {
     const oldest = cache.keys().next().value;
     if (oldest === undefined) break;
-    cache.delete(oldest);
+    cacheDelete(oldest);
   }
 }
 export function clearCache() {
   // Clear only the current user's cached entries.
   const uid = currentUser()?.id || 'anon';
   const prefix = `${uid}::`;
-  for (const k of cache.keys()) if (k.startsWith(prefix)) cache.delete(k);
+  for (const k of [...cache.keys()]) if (k.startsWith(prefix)) cacheDelete(k);
 }
 
 // ---- URL helpers (multi-org aware) ----
