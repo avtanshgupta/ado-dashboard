@@ -11,15 +11,32 @@ function Th({ label, k, sort, setSort, align }) {
   const apply = () => setSort((s) => ({ key: k, dir: s.key === k && s.dir === 'desc' ? 'asc' : 'desc' }));
   return (
     <th
-      onClick={apply}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(); } }}
-      tabIndex={0}
+      scope="col"
       aria-sort={ariaSort}
       title={`Sort by ${label}`}
       style={align ? { textAlign: align } : undefined}
     >
-      {label}
-      {active && <span className="sort-ind">{sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}</span>}
+      <button
+        type="button"
+        onClick={apply}
+        aria-label={`Sort by ${label}${active ? `, currently ${ariaSort}` : ''}`}
+        style={{
+          appearance: 'none',
+          background: 'none',
+          border: 0,
+          color: 'inherit',
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          font: 'inherit',
+          padding: 0,
+          textAlign: align || 'left',
+        }}
+      >
+        {label}
+        {active && <span className="sort-ind">{sort.dir === 'asc' ? <ArrowUp size={12} aria-hidden="true" /> : <ArrowDown size={12} aria-hidden="true" />}</span>}
+      </button>
     </th>
   );
 }
@@ -29,7 +46,7 @@ export function WorkItemTable({ items, sort, setSort, typeColors = {}, density =
   const slaDays = config?.slaDays || 7;
   return (
     <div className="table-wrap">
-      <table className={`pr-table ${density === 'compact' ? 'compact' : ''}`}>
+      <table className={`pr-table ${density === 'compact' ? 'compact' : ''}`} aria-label="Work items">
         <thead>
           <tr>
             <Th label="Type" k="type" sort={sort} setSort={setSort} />
@@ -40,7 +57,7 @@ export function WorkItemTable({ items, sort, setSort, typeColors = {}, density =
             <Th label="Points" k="storyPoints" sort={sort} setSort={setSort} align="center" />
             <Th label="Iteration" k="iterationPath" sort={sort} setSort={setSort} />
             <Th label="Updated" k="changedDate" sort={sort} setSort={setSort} />
-            <th style={{ textAlign: 'right' }}>Actions</th>
+            <th scope="col" style={{ textAlign: 'right' }}>Actions</th>
           </tr>
         </thead>
         <tbody>

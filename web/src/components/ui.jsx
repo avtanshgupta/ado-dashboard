@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useId } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { timeAgo, fmtDate, daysSinceDate } from '../lib/format.js';
@@ -7,6 +7,7 @@ import {
   MessageSquare, TriangleAlert, Info, Inbox, ShieldCheck, Clock,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LoaderCircle,
 } from './icons.jsx';
+import { getFocusableElements, trapFocus } from './focusTrap.js';
 
 marked.setOptions({ gfm: true, breaks: true });
 
@@ -193,8 +194,8 @@ export function Avatar({ name, imageUrl, size = 28 }) {
 /* ---------------- Loading / Empty ---------------- */
 export function Loading({ label = 'Loading…' }) {
   return (
-    <div className="loading">
-      <div className="spinner" />
+    <div className="loading" role="status" aria-live="polite" aria-label={label}>
+      <div className="spinner" aria-hidden="true" />
       <div>{label}</div>
     </div>
   );
@@ -274,7 +275,7 @@ export function Pager({ page, pageSize, total, onPage, onPageSize, pageSizes = [
 
 export function ErrorBox({ error, onRetry }) {
   return (
-    <div className="empty">
+    <div className="empty" role="alert">
       <TriangleAlert size={38} strokeWidth={1.5} style={{ color: 'var(--red)' }} aria-hidden="true" />
       <div style={{ color: 'var(--red)', fontWeight: 600 }}>Something went wrong</div>
       <div style={{ maxWidth: 520, textAlign: 'center' }}>{String(error?.message || error)}</div>
@@ -289,10 +290,49 @@ export function ErrorBox({ error, onRetry }) {
 
 /* ---------------- Modal ---------------- */
 export function Modal({ title, children, onClose, footer }) {
+  const titleId = useId();
+  const modalRef = useRef(null);
+  const restoreRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    restoreRef.current = document.activeElement;
+    const t = setTimeout(() => {
+      const first = getFocusableElements(modalRef.current)[0];
+      first?.focus();
+    }, 0);
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCloseRef.current?.();
+      } else {
+        trapFocus(modalRef.current, e);
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('keydown', onKeyDown);
+      restoreRef.current?.focus?.();
+    };
+  }, []);
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{title}</h3>
+      <div
+        className="modal"
+        ref={modalRef}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
+        <h3 id={titleId}>{title}</h3>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
@@ -319,12 +359,17 @@ export function ToastProvider({ children }) {
   return (
     <ToastCtx.Provider value={api}>
       {children}
-      <div className="toast-wrap">
+      <div className="toast-wrap" role="status" aria-live="polite" aria-atomic="false">
         {toasts.map((t) => {
           const Icon = t.type === 'success' ? CheckCircle2 : t.type === 'error' ? TriangleAlert : Info;
           return (
-            <div key={t.id} className={`toast ${t.type}`}>
-              <Icon size={16} /> <span>{t.message}</span>
+            <div
+              key={t.id}
+              className={`toast ${t.type}`}
+              role={t.type === 'error' ? 'alert' : undefined}
+              aria-live={t.type === 'error' ? 'assertive' : undefined}
+            >
+              <Icon size={16} aria-hidden="true" /> <span>{t.message}</span>
             </div>
           );
         })}

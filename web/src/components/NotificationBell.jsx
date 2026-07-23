@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useConfig, useApp } from '../lib/AppContext.jsx';
 import { repoShort } from '../lib/format.js';
 import { TimeAgo } from './ui.jsx';
+import { getFocusableElements, trapFocus } from './focusTrap.js';
 import {
   Bell, GitPullRequest, MessageSquare, Eye, XCircle, CheckCircle2,
   GitMerge, Info, PartyPopper, Bot, Clock,
@@ -56,6 +57,9 @@ export function NotificationBell() {
   const [filterType, setFilterType] = useState('all');
   const [filterRepo, setFilterRepo] = useState('all');
   const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const popRef = useRef(null);
+  const restoreRef = useRef(null);
   const pushEnabled = !!(config && config.notificationPrefs && config.notificationPrefs.browserPush);
 
   const load = useCallback(async () => {
@@ -134,8 +138,34 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
+  useEffect(() => {
+    if (!open) {
+      restoreRef.current?.focus?.();
+      restoreRef.current = null;
+      return undefined;
+    }
+    const t = setTimeout(() => {
+      const first = getFocusableElements(popRef.current)[0];
+      first?.focus();
+    }, 0);
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setOpen(false);
+      } else {
+        trapFocus(popRef.current, e);
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
   async function toggle() {
     const next = !open;
+    if (next) restoreRef.current = document.activeElement || buttonRef.current;
     setOpen(next);
     if (next) await load();
   }
@@ -189,10 +219,11 @@ export function NotificationBell() {
   return (
     <div className="notif" ref={ref}>
       <button
+        ref={buttonRef}
         className="icon-btn"
         onClick={toggle}
         aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-expanded={open}
         title="Notifications"
       >
@@ -200,7 +231,14 @@ export function NotificationBell() {
         {unread > 0 && <span className="badge-dot">{unread > 99 ? '99+' : unread}</span>}
       </button>
       {open && (
-        <div className="notif-pop" role="menu">
+        <div
+          className="notif-pop"
+          ref={popRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Notifications"
+          tabIndex={-1}
+        >
           <div className="notif-head">
             <strong>Notifications</strong>
             {hasUnread && (
@@ -228,13 +266,13 @@ export function NotificationBell() {
           )}
           <div className="notif-list">
             {filtered.length === 0 ? (
-              <div className="notif-empty muted"><PartyPopper size={16} /> {items.length ? 'No matching notifications' : "You're all caught up"}</div>
+              <div className="notif-empty muted"><PartyPopper size={16} aria-hidden="true" /> {items.length ? 'No matching notifications' : "You're all caught up"}</div>
             ) : (
               filtered.slice(0, 50).map((item) => {
                 const TypeIcon = TYPE_ICON[item.type] || Info;
                 return (
                   <div key={item.id} className={`notif-item ${item.read ? '' : 'unread'}`}>
-                    <button className="notif-item-main" onClick={() => openItem(item)} role="menuitem">
+                    <button className="notif-item-main" onClick={() => openItem(item)}>
                       <span className="notif-icon" aria-hidden="true"><TypeIcon size={16} /></span>
                       <span className="notif-content">
                         <span className="notif-msg">{item.message}</span>

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { AppContext } from './lib/AppContext.jsx';
 import { api } from './lib/api.js';
 import { cacheClear } from './lib/dataCache.js';
 import { ToastProvider, Loading, ErrorBox } from './components/ui.jsx';
+import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { Layout } from './components/Layout.jsx';
 import { Login } from './pages/Login.jsx';
 import { ProjectOverview } from './pages/ProjectOverview.jsx';
@@ -29,6 +30,7 @@ import { Settings } from './pages/Settings.jsx';
 import { CopilotSessions } from './pages/CopilotSessions.jsx';
 
 export default function App() {
+  const location = useLocation();
   const [phase, setPhase] = useState('loading'); // loading | login | ready | error
   const [config, setConfig] = useState(null);
   const [user, setUser] = useState(null);
@@ -160,7 +162,7 @@ export default function App() {
         )}
         <div key={epoch} style={{ display: 'contents' }}>
           <Routes>
-            <Route element={<Layout />}>
+            <Route element={<ErrorBoundary resetKeys={[location.pathname, location.search]}><Layout /></ErrorBoundary>}>
               <Route index element={<ProjectOverview />} />
               <Route path="action-center" element={<ActionCenter />} />
               <Route path="pull-requests" element={<PullRequests />}>

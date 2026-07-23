@@ -5,6 +5,7 @@ import {
   Zap, LayoutDashboard, GitPullRequestArrow, Eye, UserCheck, Users,
   Workflow, Settings, Search, Sun, LogOut, RefreshCw, ClipboardList, CalendarClock,
 } from './icons.jsx';
+import { trapFocus } from './focusTrap.js';
 
 /**
  * ⌘K / Ctrl-K command palette: instant navigation + free-text search, fully
@@ -18,6 +19,8 @@ export function CommandPalette({ onLogout, onCycleTheme }) {
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const dialogRef = useRef(null);
+  const restoreRef = useRef(null);
 
   const baseCommands = useMemo(
     () => [
@@ -62,19 +65,26 @@ export function CommandPalette({ onLogout, onCycleTheme }) {
     return [...extras, searchCmd, ...matched];
   }, [q, baseCommands, navigate]);
 
+  const close = useCallback(() => {
+    setOpen(false);
+  }, []);
+
   useEffect(() => {
     function onKey(e) {
       const k = e.key?.toLowerCase();
       if ((e.metaKey || e.ctrlKey) && k === 'k') {
         e.preventDefault();
-        setOpen((o) => !o);
+        setOpen((o) => {
+          if (!o) restoreRef.current = document.activeElement;
+          return !o;
+        });
       } else if (e.key === 'Escape') {
-        setOpen(false);
+        close();
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [close]);
 
   useEffect(() => {
     if (open) {
@@ -83,6 +93,8 @@ export function CommandPalette({ onLogout, onCycleTheme }) {
       const t = setTimeout(() => inputRef.current?.focus(), 0);
       return () => clearTimeout(t);
     }
+    restoreRef.current?.focus?.();
+    restoreRef.current = null;
     return undefined;
   }, [open]);
 
@@ -98,9 +110,9 @@ export function CommandPalette({ onLogout, onCycleTheme }) {
 
   const run = useCallback((cmd) => {
     if (!cmd) return;
-    setOpen(false);
+    close();
     cmd.run();
-  }, []);
+  }, [close]);
 
   if (!open) return null;
 
@@ -118,8 +130,17 @@ export function CommandPalette({ onLogout, onCycleTheme }) {
   }
 
   return (
-    <div className="cmdk-backdrop" onClick={() => setOpen(false)} role="dialog" aria-modal="true" aria-label="Command palette">
-      <div className="cmdk" onClick={(e) => e.stopPropagation()}>
+    <div className="cmdk-backdrop" onClick={close}>
+      <div
+        className="cmdk"
+        ref={dialogRef}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => trapFocus(dialogRef.current, e)}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
+        tabIndex={-1}
+      >
         <div className="cmdk-input-row">
           <Search size={16} aria-hidden="true" />
           <input
@@ -130,19 +151,24 @@ export function CommandPalette({ onLogout, onCycleTheme }) {
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onInputKey}
             aria-label="Command or search"
+            aria-controls="command-palette-list"
+            aria-activedescendant={commands[active] ? `command-${commands[active].id}` : undefined}
           />
         </div>
-        <div className="cmdk-list" ref={listRef}>
+        <div className="cmdk-list" ref={listRef} id="command-palette-list" role="listbox" aria-label="Commands">
           {commands.length === 0 && <div className="cmdk-empty muted">No matching commands</div>}
           {commands.map((c, i) => (
             <button
               key={c.id}
+              id={`command-${c.id}`}
               type="button"
               className={`cmdk-item ${i === active ? 'active' : ''}`}
               onMouseEnter={() => setActive(i)}
               onClick={() => run(c)}
+              role="option"
+              aria-selected={i === active}
             >
-              <span className="cmdk-item-icon"><c.Icon size={15} /></span>
+              <span className="cmdk-item-icon"><c.Icon size={15} aria-hidden="true" /></span>
               <span className="cmdk-item-label">{c.label}</span>
               {c.hint && <span className="cmdk-item-hint muted">{c.hint}</span>}
             </button>
