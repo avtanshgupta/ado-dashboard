@@ -2,8 +2,13 @@ node_modules/
 web/dist/
 server/.env
 server/data/
+server/.test-data/
 *.log
 .DS_Store
+
+# Python reporter bytecode (e.g. from a local py_compile)
+__pycache__/
+*.pyc
 
 # Deployment staging artifacts (created by the App Service zip-deploy flow)
 dist/
