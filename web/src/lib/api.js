@@ -26,7 +26,7 @@ function invalidateForMutation(path) {
   }
 }
 
-async function req(path, { method = 'GET', body } = {}) {
+async function doFetch(path, method, body) {
   const init = { method, headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' };
   if (body !== undefined) {
     init.headers['Content-Type'] = 'application/json';
@@ -63,6 +63,22 @@ async function req(path, { method = 'GET', body } = {}) {
     }
   }
   return data;
+}
+
+// In-flight GET de-duplication: if several components request the same path at
+// once (e.g. the search page and a widget both loading a PR list), they share a
+// single network round-trip instead of firing duplicate ADO calls. Only GETs are
+// coalesced — mutations must always execute. The entry clears as soon as the
+// request settles, so this never serves a stale response (that's the SWR cache's job).
+const inflight = new Map();
+
+function req(path, { method = 'GET', body } = {}) {
+  if (method !== 'GET') return doFetch(path, method, body);
+  const existing = inflight.get(path);
+  if (existing) return existing;
+  const p = doFetch(path, method, body).finally(() => inflight.delete(path));
+  inflight.set(path, p);
+  return p;
 }
 
 export const api = {
