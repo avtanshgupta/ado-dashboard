@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, Outlet } from 'react-router-dom';
 import { useConfig, useApp } from '../lib/AppContext.jsx';
+import { api } from '../lib/api.js';
 import { Avatar } from './ui.jsx';
 import { NotificationBell } from './NotificationBell.jsx';
 import { CommandPalette } from './CommandPalette.jsx';
@@ -31,7 +32,7 @@ const COLLAPSE_KEY = 'ado-nav-collapsed';
 
 export function Layout() {
   const config = useConfig();
-  const { logout } = useApp();
+  const { logout, reloadConfig } = useApp();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false); // mobile drawer
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
@@ -44,6 +45,16 @@ export function Layout() {
     const next = THEME_CYCLE[theme] || 'system';
     setThemePref(next);
     setTheme(next);
+  }
+
+  async function toggleDensity() {
+    const next = (config.uiPrefs?.density || 'comfortable') === 'compact' ? 'comfortable' : 'compact';
+    try {
+      await api.updateConfig({ uiPrefs: { density: next } });
+      await reloadConfig();
+    } catch {
+      /* ignore — a failed toggle just leaves the current density in place */
+    }
   }
 
   useEffect(() => {
@@ -65,7 +76,7 @@ export function Layout() {
 
   return (
     <div className={`app ${collapsed ? 'nav-collapsed' : ''}`}>
-      <CommandPalette onLogout={logout} onCycleTheme={cycleTheme} />
+      <CommandPalette onLogout={logout} onCycleTheme={cycleTheme} onToggleDensity={toggleDensity} />
       <KeyboardShortcuts />
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <aside className={`sidebar ${open ? 'open' : ''}`}>

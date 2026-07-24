@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import {
   Zap, LayoutDashboard, GitPullRequestArrow, Eye, UserCheck, Users,
   Workflow, Settings, Search, Sun, LogOut, RefreshCw, ClipboardList, CalendarClock,
+  Bot, Play, SlidersHorizontal,
 } from './icons.jsx';
 import { trapFocus } from './focusTrap.js';
 
@@ -12,7 +13,7 @@ import { trapFocus } from './focusTrap.js';
  * keyboard-driven (↑/↓ to move, ↵ to run, Esc to close). Mounted once globally so
  * it works from any page. Typing anything offers a "search PRs & pipelines" jump.
  */
-export function CommandPalette({ onLogout, onCycleTheme }) {
+export function CommandPalette({ onLogout, onCycleTheme, onToggleDensity }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -27,6 +28,7 @@ export function CommandPalette({ onLogout, onCycleTheme }) {
       { id: 'ac', label: 'Go to Action Center', hint: 'what needs you', Icon: Zap, run: () => navigate('/action-center') },
       { id: 'overview', label: 'Go to Dashboard', hint: 'dashboard home', Icon: LayoutDashboard, run: () => navigate('/') },
       { id: 'created', label: 'My Pull Requests', hint: 'PRs I authored', Icon: GitPullRequestArrow, run: () => navigate('/pull-requests/created') },
+      { id: 'pr-new', label: 'New Pull Request', hint: 'create a PR', Icon: GitPullRequestArrow, run: () => navigate('/pull-requests/new') },
       { id: 'assigned', label: 'Assigned to Me', hint: 'PRs to review', Icon: Eye, run: () => navigate('/pull-requests/assigned') },
       { id: 'assignedTeam', label: 'Assigned to Team', hint: 'group review', Icon: UserCheck, run: () => navigate('/pull-requests/assigned-team') },
       { id: 'team', label: 'Team Pull Requests', hint: 'authored by team', Icon: Users, run: () => navigate('/pull-requests/team') },
@@ -36,12 +38,15 @@ export function CommandPalette({ onLogout, onCycleTheme }) {
       { id: 'wi-sprint', label: 'Current Sprint', hint: 'active iteration', Icon: CalendarClock, run: () => navigate('/work-items/sprint') },
       { id: 'wi-new', label: 'New Work Item', hint: 'create a work item', Icon: ClipboardList, run: () => navigate('/work-items/new') },
       { id: 'pipelines', label: 'Go to Pipelines', hint: 'runs & analytics', Icon: Workflow, run: () => navigate('/pipelines') },
+      { id: 'pl-trigger', label: 'Trigger a Pipeline', hint: 'run a build', Icon: Play, run: () => navigate('/pipelines/trigger') },
+      { id: 'agents', label: 'Go to Agents', hint: 'Copilot sessions', Icon: Bot, run: () => navigate('/agents') },
       { id: 'settings', label: 'Go to Settings', hint: 'repos, team, prefs', Icon: Settings, run: () => navigate('/settings') },
       { id: 'refresh', label: 'Refresh current data', hint: 'clear cache & reload', Icon: RefreshCw, run: async () => { try { await api.refresh(); } catch { /* ignore */ } window.location.reload(); } },
+      { id: 'density', label: 'Toggle table density', hint: 'compact / comfortable', Icon: SlidersHorizontal, run: () => onToggleDensity?.() },
       { id: 'theme', label: 'Toggle theme', hint: 'light / dark / system', Icon: Sun, run: () => onCycleTheme?.() },
       { id: 'logout', label: 'Sign out', hint: 'end session', Icon: LogOut, run: () => onLogout?.() },
     ],
-    [navigate, onCycleTheme, onLogout]
+    [navigate, onCycleTheme, onLogout, onToggleDensity]
   );
 
   const commands = useMemo(() => {
