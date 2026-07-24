@@ -30,7 +30,6 @@ import { SearchPage } from './pages/SearchPage.jsx';
 import { Settings } from './pages/Settings.jsx';
 import { CopilotSessions } from './pages/CopilotSessions.jsx';
 import { MyWork } from './pages/MyWork.jsx';
-import { Insights } from './pages/Insights.jsx';
 
 export default function App() {
   const location = useLocation();
@@ -177,7 +176,6 @@ export default function App() {
             <Route element={<ErrorBoundary resetKeys={[location.pathname, location.search]}><Layout /></ErrorBoundary>}>
               <Route index element={<ProjectOverview />} />
               <Route path="my-work" element={<MyWork />} />
-              <Route path="insights" element={<Insights />} />
               <Route path="action-center" element={<ActionCenter />} />
               <Route path="pull-requests" element={<PullRequests />}>
                 <Route index element={<Overview />} />
