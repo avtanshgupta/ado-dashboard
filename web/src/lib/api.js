@@ -62,6 +62,21 @@ async function doFetch(path, method, body) {
       /* cache invalidation is best-effort */
     }
   }
+  // Surface per-source partial failures (some repos/projects failed while others
+  // succeeded) so the UI can show a non-blocking banner.
+  if (typeof window !== 'undefined') {
+    const ph = res.headers.get('X-Partial-Errors');
+    if (ph) {
+      try {
+        const partials = JSON.parse(decodeURIComponent(ph));
+        if (Array.isArray(partials) && partials.length) {
+          window.dispatchEvent(new CustomEvent('ado-partial-errors', { detail: { partials } }));
+        }
+      } catch {
+        /* ignore malformed header */
+      }
+    }
+  }
   return data;
 }
 

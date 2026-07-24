@@ -1,5 +1,6 @@
-import { currentConfig, currentUser } from '../lib/context.js';
+import { currentConfig, currentUser, getPartials } from '../lib/context.js';
 import { adoGet, gitUrl, policyUrl, witUrl, projectForRepo } from '../lib/adoClient.js';
+import { settleAll, settleFlat } from '../lib/settle.js';
 import { buildActionCenter, applyActionOverlay, itemSignature } from '../lib/prPriority.js';
 import { buildPrAnalytics } from '../lib/prAnalytics.js';
 import { buildStandup } from '../lib/standup.js';
@@ -251,10 +252,14 @@ const LIST_OPTS = { commits: false, files: false };
 export async function listCreated({ status = 'active' } = {}) {
   const cfg = currentConfig();
   const me = currentUser();
-  const lists = await Promise.all(
-    cfg.repositories.map((repo) => fetchPRs(repo, { creatorId: me.id, status }, 300))
+  // Graceful degradation: a single failing repo is dropped (recorded as a
+  // partial error) rather than failing the whole list.
+  const prs = await settleFlat(
+    cfg.repositories,
+    (repo) => fetchPRs(repo, { creatorId: me.id, status }, 300),
+    { label: 'repo' }
   );
-  return enrichAll(lists.flat(), LIST_OPTS);
+  return enrichAll(prs, LIST_OPTS);
 }
 
 /**
@@ -266,8 +271,9 @@ export async function listCreated({ status = 'active' } = {}) {
 export async function listAssigned({ scope = 'me' } = {}) {
   const cfg = currentConfig();
   const me = currentUser();
-  const perRepo = await Promise.all(
-    cfg.repositories.map(async (repo) => {
+  const items = await settleFlat(
+    cfg.repositories,
+    async (repo) => {
       if (scope === 'team') {
         const active = await fetchActivePRs(repo);
         const out = [];
@@ -284,9 +290,9 @@ export async function listAssigned({ scope = 'me' } = {}) {
       return mine
         .filter((pr) => pr.createdBy?.id !== me.id)
         .map((pr) => ({ pr, isMe: true, groups: matchReviewerGroups(pr.reviewers) }));
-    })
+    },
+    { label: 'repo' }
   );
-  const items = perRepo.flat();
   const enriched = await enrichAll(items.map((x) => x.pr), LIST_OPTS);
   const metaById = new Map(items.map((x) => [x.pr.pullRequestId, x]));
   for (const pr of enriched) {
@@ -298,9 +304,7 @@ export async function listAssigned({ scope = 'me' } = {}) {
 
 export async function listTeam() {
   const cfg = currentConfig();
-  const lists = await Promise.all(cfg.repositories.map((repo) => fetchActivePRs(repo)));
-  const prs = lists
-    .flat()
+  const prs = (await settleFlat(cfg.repositories, (repo) => fetchActivePRs(repo), { label: 'repo' }))
     .filter((pr) => cfg.teamSet.has((pr.createdBy?.uniqueName || '').toLowerCase()));
   return enrichAll(prs, LIST_OPTS);
 }
@@ -331,8 +335,9 @@ export async function getOverview({ months } = {}) {
     return c;
   };
 
-  const perRepo = await Promise.all(
-    cfg.repositories.map(async (repo) => {
+  const { results: perRepo } = await settleAll(
+    cfg.repositories,
+    async (repo) => {
       const [mine, assignedDirect, allRecent] = await Promise.all([
         fetchPRs(repo, { creatorId: me.id, status: 'all' }, 300),
         fetchPRs(repo, { reviewerId: me.id, status: 'all' }, 300),
@@ -363,7 +368,8 @@ export async function getOverview({ months } = {}) {
         assignedTeam: bucket(assignedTeam),
         team: bucket(teamPrs),
       };
-    })
+    },
+    { label: 'repo' }
   );
 
   const sum = (key) =>
@@ -384,6 +390,7 @@ export async function getOverview({ months } = {}) {
     assignedMe: sum('assignedMe'),
     assignedTeam: sum('assignedTeam'),
     team: sum('team'),
+    partialErrors: getPartials(),
   };
 }
 

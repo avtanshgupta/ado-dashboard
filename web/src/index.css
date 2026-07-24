@@ -545,6 +545,9 @@ button.subtab { background: none; border: none; border-bottom: 2px solid transpa
 .editable-label.editing input { flex: 1; min-width: 0; }
 .editable-label-edit { opacity: 0.55; }
 .editable-label-edit:hover { opacity: 1; }
+.partial-banner { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 13px; background: color-mix(in srgb, #f59e0b 14%, var(--surface)); border-bottom: 1px solid color-mix(in srgb, #f59e0b 40%, var(--border)); color: var(--text); }
+.partial-banner-close { margin-left: auto; background: none; border: none; cursor: pointer; color: var(--text-muted); display: inline-flex; padding: 2px; border-radius: 4px; }
+.partial-banner-close:hover { background: color-mix(in srgb, #f59e0b 20%, transparent); }
 @media (max-width: 480px) {
   /* Stack the label/value inputs above the remove button on very narrow screens. */
   .group-row { grid-template-columns: 1fr 1fr; }

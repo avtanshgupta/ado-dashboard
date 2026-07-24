@@ -11,7 +11,7 @@ import { BrandMark } from './BrandMark.jsx';
 import { getThemePref, setThemePref } from '../lib/theme.js';
 import {
   LayoutDashboard, GitPullRequest, Workflow, Settings,
-  Search, Menu, Sun, Moon, Monitor, LogOut, Zap, ChevronsLeft, ChevronsRight, Compass, ClipboardList, Bot,
+  Search, Menu, Sun, Moon, Monitor, LogOut, Zap, ChevronsLeft, ChevronsRight, Compass, ClipboardList, Bot, TriangleAlert, X,
 } from './icons.jsx';
 
 const THEME_CYCLE = { system: 'light', light: 'dark', dark: 'system' };
@@ -39,6 +39,7 @@ export function Layout() {
   const [q, setQ] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [theme, setTheme] = useState(getThemePref);
+  const [partialErrors, setPartialErrors] = useState(null);
   const menuRef = useRef(null);
 
   function cycleTheme() {
@@ -67,6 +68,17 @@ export function Layout() {
     }
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  // Show a non-blocking banner when a request degraded gracefully (one or more
+  // repos/projects failed while others loaded). Cleared on route change.
+  useEffect(() => {
+    function onPartial(e) {
+      const list = e.detail?.partials;
+      if (Array.isArray(list) && list.length) setPartialErrors(list);
+    }
+    window.addEventListener('ado-partial-errors', onPartial);
+    return () => window.removeEventListener('ado-partial-errors', onPartial);
   }, []);
 
   function submitSearch(e) {
@@ -159,6 +171,18 @@ export function Layout() {
             )}
           </div>
         </header>
+        {partialErrors && (
+          <div className="partial-banner no-print" role="status">
+            <TriangleAlert size={15} aria-hidden="true" />
+            <span>
+              Some sources didn’t load: {partialErrors.slice(0, 3).map((p) => p.source).join(', ')}
+              {partialErrors.length > 3 ? ` +${partialErrors.length - 3} more` : ''}. Showing available data.
+            </span>
+            <button className="partial-banner-close" onClick={() => setPartialErrors(null)} aria-label="Dismiss">
+              <X size={14} />
+            </button>
+          </div>
+        )}
         <main className="content">
           <Outlet />
         </main>

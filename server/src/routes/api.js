@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { config } from '../config.js';
-import { currentUser, currentConfig } from '../lib/context.js';
+import { currentUser, currentConfig, getPartials } from '../lib/context.js';
 import { clearCache } from '../lib/adoClient.js';
 import { saveUserConfig, effectiveConfig } from '../lib/userConfig.js';
 import {
@@ -58,12 +58,24 @@ import {
 
 const router = Router();
 
-const wrap = (fn) => (req, res) =>
-  Promise.resolve(fn(req, res)).catch((err) => {
+const wrap = (fn) => (req, res) => {
+  // Inject an X-Partial-Errors header (if the handler recorded any per-source
+  // failures) right before the JSON body is sent — the partials are collected on
+  // the request context during the awaited service calls.
+  const sendJson = res.json.bind(res);
+  res.json = (body) => {
+    const partials = getPartials();
+    if (partials.length && !res.headersSent) {
+      res.setHeader('X-Partial-Errors', encodeURIComponent(JSON.stringify(partials)));
+    }
+    return sendJson(body);
+  };
+  return Promise.resolve(fn(req, res)).catch((err) => {
     const status = err.status || 500;
     console.error(`[api] ${req.method} ${req.originalUrl} -> ${status}: ${err.message}`);
     res.status(status).json({ error: err.message, status, details: err.body || undefined });
   });
+};
 
 function buildConfigResponse(cfg) {
   return {
