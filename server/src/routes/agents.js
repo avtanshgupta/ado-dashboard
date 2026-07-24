@@ -12,6 +12,7 @@ import { snapshotState } from '../services/prService.js';
 import { currentUser } from '../lib/context.js';
 import { loadUserConfig } from '../lib/userConfig.js';
 import { generateApiKey, getApiKeyStatus, listApiKeys, revokeApiKey } from '../lib/agentApiKeys.js';
+import { matchSessionsToPrs, buildMachineTimeline } from '../lib/agentCorrelation.js';
 import { isValidTimeZone } from '../lib/userConfig.js';
 import { agentApiKeyAuth } from '../middleware/agentApiKeyAuth.js';
 import { createRateLimit } from '../middleware/rateLimit.js';
@@ -130,26 +131,29 @@ router.get('/analytics', (req, res) => {
 });
 
 // Open PRs matching each live session's repo + branch (best-effort; may be slow).
+// The response is keyed by "repo#branch": { count, url, prs:[{ id,title,reviewStatus,… }] }.
 router.get('/pr-matches', async (req, res) => {
   try {
     const user = currentUser();
     const groups = agentService.getSessionsByMachine(user.id, thresholds(user.id));
-    const wanted = new Set();
-    for (const g of groups) {
-      for (const s of g.sessions) {
-        if (s.status !== 'ended' && s.repo && s.branch) wanted.add(`${s.repo.toLowerCase()}#${s.branch}`);
-      }
-    }
-    if (wanted.size === 0) return res.json({ matches: {} });
+    const hasLive = groups.some((g) => g.sessions.some((s) => s.status !== 'ended' && s.repo && s.branch));
+    if (!hasLive) return res.json({ matches: {} });
     const prs = await snapshotState();
-    const matches = {};
-    for (const pr of prs) {
-      const k = `${String(pr.repo).toLowerCase()}#${pr.sourceBranch}`;
-      if (!wanted.has(k)) continue;
-      if (!matches[k]) matches[k] = { count: 0, url: pr.webUrl };
-      matches[k].count += 1;
-    }
-    res.json({ matches });
+    res.json(matchSessionsToPrs(groups, prs));
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Chronological (newest-first) activity timeline for one machine, flattened from
+// its sessions' status history. Body/query: none. Returns { value: [...] }.
+router.get('/machines/:machineId/timeline', (req, res) => {
+  try {
+    const user = currentUser();
+    const groups = agentService.getSessionsByMachine(user.id, thresholds(user.id));
+    const group = groups.find((g) => g.machineId === req.params.machineId);
+    if (!group) return res.status(404).json({ error: 'Machine not found' });
+    res.json({ value: buildMachineTimeline(group) });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }

@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { Server, ChevronDown, ChevronRight, SquarePen, Check, X, Trash2, Hourglass } from './icons.jsx';
+import { Server, ChevronDown, ChevronRight, SquarePen, Check, X, Trash2, Hourglass, History } from './icons.jsx';
 import { AgentSessionCard } from './AgentSessionCard.jsx';
+import { api } from '../lib/api.js';
+import { timeAgo } from '../lib/format.js';
+
+const TL_STATUS_COLORS = { active: '#22c55e', idle: '#eab308', stale: '#ef4444', ended: '#6b7280', started: '#3b82f6' };
 
 export function MachineGroup({ group, onEnd, onRename, onRemove, onOpenSession, prMatches }) {
   const { machineId, machineName, label, name, sessions, status, lastSeenAgo, longRunning } = group;
@@ -8,7 +12,29 @@ export function MachineGroup({ group, onEnd, onRename, onRemove, onOpenSession, 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(label || '');
   const [busy, setBusy] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [timeline, setTimeline] = useState(null);
+  const [tlLoading, setTlLoading] = useState(false);
   const activeCount = sessions.filter((s) => s.status === 'active').length;
+
+  async function toggleTimeline(e) {
+    e.stopPropagation();
+    const next = !showTimeline;
+    setShowTimeline(next);
+    // Lazy-load once: the aggregated timeline is derived server-side from every
+    // session's status history, so only fetch it when the user asks to see it.
+    if (next && timeline === null && !tlLoading) {
+      setTlLoading(true);
+      try {
+        const r = await api.agentMachineTimeline(machineId);
+        setTimeline(r.value || []);
+      } catch {
+        setTimeline([]);
+      } finally {
+        setTlLoading(false);
+      }
+    }
+  }
 
   function startEdit(e) {
     e.stopPropagation();
@@ -72,6 +98,9 @@ export function MachineGroup({ group, onEnd, onRename, onRemove, onOpenSession, 
           </form>
         ) : (
           <>
+            <button className="btn-icon machine-timeline-btn" onClick={toggleTimeline} title="Activity timeline" aria-expanded={showTimeline}>
+              <History size={13} />
+            </button>
             <button className="btn-icon machine-edit" onClick={startEdit} title="Rename machine">
               <SquarePen size={13} />
             </button>
@@ -104,6 +133,27 @@ export function MachineGroup({ group, onEnd, onRename, onRemove, onOpenSession, 
               />
             );
           })}
+        </div>
+      )}
+      {showTimeline && (
+        <div className="machine-timeline">
+          {tlLoading && <div className="machine-timeline-empty muted">Loading activity…</div>}
+          {!tlLoading && timeline && timeline.length === 0 && (
+            <div className="machine-timeline-empty muted">No recorded activity yet.</div>
+          )}
+          {!tlLoading && timeline && timeline.length > 0 && (
+            <ul className="machine-timeline-list">
+              {timeline.map((e, i) => (
+                <li key={`${e.t}-${i}`}>
+                  <span className="status-dot" style={{ background: TL_STATUS_COLORS[e.status] || '#6b7280' }} />
+                  <span className="tl-session mono">{e.sessionId}</span>
+                  <span className="tl-status">{e.status}</span>
+                  {e.repo && <span className="tl-repo muted">{e.repo}</span>}
+                  <span className="tl-time muted">{timeAgo(e.t)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

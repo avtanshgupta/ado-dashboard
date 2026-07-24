@@ -71,9 +71,28 @@ export function AgentSessionCard({ session, onEnd, onOpen, prMatch }) {
           <span className="detail"><GitBranch size={13} /> {branch}</span>
         )}
         {prMatch && prMatch.count > 0 && (
-          <a className="detail pr-link" href={prMatch.url} target="_blank" rel="noopener noreferrer" title="Open pull request">
-            <GitPullRequest size={13} /> {prMatch.count} open PR{prMatch.count !== 1 ? 's' : ''}
-          </a>
+          Array.isArray(prMatch.prs) && prMatch.prs.length > 0 ? (
+            <span className="detail pr-match-list">
+              {prMatch.prs.slice(0, 2).map((pr) => (
+                <a
+                  key={pr.id}
+                  className="pr-link"
+                  href={pr.webUrl || prMatch.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`${pr.title || 'Pull request'}${pr.reviewStatus ? ` — ${pr.reviewStatus}` : ''}`}
+                >
+                  <GitPullRequest size={13} /> !{pr.id}
+                  {pr.reviewStatus ? <span className="pr-review muted"> · {pr.reviewStatus}</span> : null}
+                </a>
+              ))}
+              {prMatch.count > 2 && <span className="muted">+{prMatch.count - 2} more</span>}
+            </span>
+          ) : (
+            <a className="detail pr-link" href={prMatch.url} target="_blank" rel="noopener noreferrer" title="Open pull request">
+              <GitPullRequest size={13} /> {prMatch.count} open PR{prMatch.count !== 1 ? 's' : ''}
+            </a>
+          )
         )}
         {cwd && (
           <span className="detail"><Terminal size={13} /> {cwd}</span>

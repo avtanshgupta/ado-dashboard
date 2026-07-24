@@ -1034,6 +1034,18 @@ a.kv:hover { background: var(--surface-2); }
 .machine-header .machine-meta { margin-left: auto; font-weight: 400; font-size: 0.8rem; color: var(--text-subtle); display: flex; align-items: center; gap: 8px; }
 .machine-header .active-badge { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
 .machine-sessions { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.machine-timeline { padding: 4px 12px 12px; border-top: 1px dashed var(--border); }
+.machine-timeline-empty { font-size: 0.78rem; padding: 8px 4px; }
+.machine-timeline-list { list-style: none; margin: 0; padding: 6px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.machine-timeline-list li { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; }
+.machine-timeline-list .tl-session { font-size: 0.72rem; color: var(--text-subtle); }
+.machine-timeline-list .tl-status { text-transform: capitalize; font-weight: 500; }
+.machine-timeline-list .tl-repo { font-size: 0.72rem; }
+.machine-timeline-list .tl-time { margin-left: auto; font-size: 0.72rem; }
+.session-details .pr-match-list { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.session-details .pr-match-list .pr-link { color: var(--accent); text-decoration: none; }
+.session-details .pr-match-list .pr-link:hover { text-decoration: underline; }
+.session-details .pr-review { font-weight: 400; }
 
 .agent-session-card { padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
 .agent-session-card.status-stale { border-left: 3px solid #ef4444; }
