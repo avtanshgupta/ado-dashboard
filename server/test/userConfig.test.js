@@ -209,3 +209,40 @@ test('effectiveConfig scopes workItemProjects to the monitored projects (with or
   assert.equal(eff.projectOrgMap.get('alpha'), 'https://microsoft.visualstudio.com');
   assert.equal(eff.projectOrgMap.get('beta'), 'https://dev.azure.com/OtherOrg');
 });
+
+// --- A1: editable display labels round-trip through save/normalize -------------
+
+test('A1: custom pipeline name and label persist through saveUserConfig', () => {
+  const saved = saveUserConfig('a1-pipe', {
+    pipelines: [{ definitionId: 42, repo: 'RepoA', name: 'Nightly Linux', label: 'Nightly' }],
+  });
+  assert.equal(saved.pipelines[0].definitionId, 42);
+  assert.equal(saved.pipelines[0].name, 'Nightly Linux');
+  assert.equal(saved.pipelines[0].label, 'Nightly');
+  assert.equal(loadUserConfig('a1-pipe').pipelines[0].name, 'Nightly Linux');
+});
+
+test('A1: a blank pipeline name is dropped (falls back to the resolved name)', () => {
+  const saved = saveUserConfig('a1-pipe2', { pipelines: [{ definitionId: 7, name: '   ' }] });
+  assert.equal('name' in saved.pipelines[0], false);
+});
+
+test('A1: renamed saved query keeps its custom name; blank falls back to the id', () => {
+  const withName = saveUserConfig('a1-q', {
+    workItemSavedQueries: [{ id: 'guid-123', name: 'My open bugs' }],
+  });
+  assert.equal(withName.workItemSavedQueries[0].name, 'My open bugs');
+
+  const blank = saveUserConfig('a1-q2', { workItemSavedQueries: [{ id: 'guid-9', name: '' }] });
+  assert.equal(blank.workItemSavedQueries[0].name, 'guid-9'); // server falls back to the id
+});
+
+test('A1: review-group alias label round-trips; blank label defaults to the group name', () => {
+  const withLabel = saveUserConfig('a1-grp', {
+    reviewerGroups: [{ name: '[Proj]\\Team', label: 'My Team' }],
+  });
+  assert.equal(withLabel.reviewerGroups[0].label, 'My Team');
+
+  const blank = saveUserConfig('a1-grp2', { reviewerGroups: [{ name: '[Proj]\\Team' }] });
+  assert.equal(blank.reviewerGroups[0].label, '[Proj]\\Team'); // defaults to name
+});

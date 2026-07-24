@@ -3,7 +3,51 @@ import { useConfig, useApp } from '../lib/AppContext.jsx';
 import { useToast } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
 import { fmtDate, fmtDateShort, COMMON_TIME_ZONES, DEFAULT_TIME_ZONE } from '../lib/format.js';
-import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser, Bot, Download, Trash2, Check, Terminal, Plus } from '../components/icons.jsx';
+import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser, Bot, Download, Trash2, Check, Terminal, Plus, SquarePen } from '../components/icons.jsx';
+
+/**
+ * Inline-editable display label. Shows the value with a pencil; clicking reveals
+ * an input with save (↵) / cancel (Esc). Saving an empty value clears the custom
+ * name so the caller can fall back to a resolved/default. Powers renaming of the
+ * previously remove-only config items (pipelines, saved queries, group aliases).
+ */
+function EditableLabel({ value, placeholder, onSave, title = 'Rename' }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || '');
+  useEffect(() => {
+    if (!editing) setDraft(value || '');
+  }, [value, editing]);
+
+  if (editing) {
+    const commit = () => { onSave((draft || '').trim()); setEditing(false); };
+    const cancel = () => { setDraft(value || ''); setEditing(false); };
+    return (
+      <span className="editable-label editing">
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+          }}
+          maxLength={200}
+          aria-label="Display name"
+        />
+        <button type="button" className="btn-icon" title="Save name" onClick={commit}><Check size={14} /></button>
+        <button type="button" className="btn-icon" title="Cancel" onClick={cancel}><X size={14} /></button>
+      </span>
+    );
+  }
+  return (
+    <span className="editable-label">
+      <span className="editable-label-text">{value || placeholder}</span>
+      <button type="button" className="btn-icon editable-label-edit" title={title} onClick={() => setEditing(true)}>
+        <SquarePen size={13} />
+      </button>
+    </span>
+  );
+}
 
 /**
  * Tag input that searches Azure DevOps users as you type (by alias or email) and
@@ -545,7 +589,12 @@ export function Settings() {
                 </div>
                 {groups.map((g) => (
                   <div className="group-row" key={g.name}>
-                    <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.label || g.name}</span>
+                    <EditableLabel
+                      value={g.label && g.label !== g.name ? g.label : ''}
+                      placeholder={g.label || g.name}
+                      title="Rename alias"
+                      onSave={(label) => setGroups(groups.map((x) => (x.name === g.name ? { ...x, label: label || x.name } : x)))}
+                    />
                     <span title={g.name} style={{ fontSize: 12.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</span>
                     <button className="btn sm" onClick={() => setGroups(groups.filter((x) => x.name !== g.name))}>Remove</button>
                   </div>
@@ -575,9 +624,12 @@ export function Settings() {
               </div>
               {pipelines.map((p, i) => (
                 <div className="group-row" key={`${p.definitionId}`}>
-                  <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {p.name || plNames[p.definitionId] || `Pipeline ${p.definitionId}`}
-                  </span>
+                  <EditableLabel
+                    value={p.name || ''}
+                    placeholder={plNames[p.definitionId] || `Pipeline ${p.definitionId}`}
+                    title="Rename pipeline"
+                    onSave={(name) => setPipelines(pipelines.map((x, j) => (j === i ? { ...x, name } : x)))}
+                  />
                   <span title={p.repo} style={{ fontSize: 12, color: 'var(--text-muted)' }}>#{p.definitionId} · {p.repo || '—'}</span>
                   <button className="btn sm" onClick={() => setPipelines(pipelines.filter((_, j) => j !== i))}>Remove</button>
                 </div>
@@ -625,7 +677,12 @@ export function Settings() {
               </div>
               {wiQueries.map((q, i) => (
                 <div className="group-row" key={q.id || i}>
-                  <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.name || q.id}</span>
+                  <EditableLabel
+                    value={q.name && q.name !== q.id ? q.name : ''}
+                    placeholder={q.name || q.id}
+                    title="Rename query"
+                    onSave={(name) => setWiQueries(wiQueries.map((x, j) => (j === i ? { ...x, name: name || x.id } : x)))}
+                  />
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{q.project || '—'}{q.org ? ` · ${orgLabel(q.org)}` : ''}</span>
                   <button className="btn sm" onClick={() => setWiQueries(wiQueries.filter((_, j) => j !== i))}>Remove</button>
                 </div>

@@ -539,6 +539,12 @@ button.subtab { background: none; border: none; border-bottom: 2px solid transpa
 .member-suggest-row:hover { background: var(--surface-2); }
 .group-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-bottom: 8px; align-items: center; }
 .group-row input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+.editable-label { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.editable-label .editable-label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.editable-label.editing { gap: 4px; }
+.editable-label.editing input { flex: 1; min-width: 0; }
+.editable-label-edit { opacity: 0.55; }
+.editable-label-edit:hover { opacity: 1; }
 @media (max-width: 480px) {
   /* Stack the label/value inputs above the remove button on very narrow screens. */
   .group-row { grid-template-columns: 1fr 1fr; }

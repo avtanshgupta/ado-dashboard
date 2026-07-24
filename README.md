@@ -241,8 +241,9 @@ persists to `server/data/users/<your-id>.json`:
 - **Recent activity** — your own audit trail of state-changing actions (under
   *Settings → Account*).
 
-> Added items (projects, repos, pipelines, queries, aliases) are **removable, not
-> editable** — remove and re-add to change one.
+> **Pipelines**, **work-item saved queries**, and **review-group aliases** can be
+> **renamed inline** (✎) to a friendly display label; **projects** and **repos** are
+> identity-bound, so those are still remove-and-re-add.
 
 ### Org defaults & seeds — `server/config/app.config.json`
 Seeds each new user's settings on first run and holds org-level constants:
