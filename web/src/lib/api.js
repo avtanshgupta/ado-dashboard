@@ -1,4 +1,30 @@
+import { cacheInvalidatePrefix } from './dataCache.js';
+
 const BASE = '/api';
+
+// Map a just-mutated path to the client SWR cache prefixes it makes stale, so a
+// write is reflected immediately on the next render instead of showing a cached
+// pre-mutation snapshot. Best-effort: unknown paths simply invalidate nothing.
+function invalidateForMutation(path) {
+  const p = (path || '').split('?')[0];
+  if (p.startsWith('/prs')) {
+    cacheInvalidatePrefix('pr:');
+    cacheInvalidatePrefix('overview');
+    cacheInvalidatePrefix('action-center');
+  } else if (p.startsWith('/workitems')) {
+    cacheInvalidatePrefix('wi:');
+    cacheInvalidatePrefix('overview');
+    cacheInvalidatePrefix('action-center');
+  } else if (p.startsWith('/pipelines')) {
+    cacheInvalidatePrefix('pl:');
+    cacheInvalidatePrefix('overview');
+  } else if (p.startsWith('/agents')) {
+    cacheInvalidatePrefix('agents:');
+  } else if (p.startsWith('/action-center') || p.startsWith('/follows')) {
+    cacheInvalidatePrefix('action-center');
+    cacheInvalidatePrefix('overview');
+  }
+}
 
 async function req(path, { method = 'GET', body } = {}) {
   const init = { method, headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' };
@@ -27,6 +53,14 @@ async function req(path, { method = 'GET', body } = {}) {
       window.dispatchEvent(new CustomEvent('ado-auth-expired', { detail: { code: err.code } }));
     }
     throw err;
+  }
+  // Drop stale client-cached lists/overviews after a successful write.
+  if (method !== 'GET') {
+    try {
+      invalidateForMutation(path);
+    } catch {
+      /* cache invalidation is best-effort */
+    }
   }
   return data;
 }

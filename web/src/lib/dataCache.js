@@ -66,3 +66,38 @@ export function cacheClear() {
     /* ignore */
   }
 }
+
+/** Remove one cached key. Returns true if it existed. */
+export function cacheInvalidate(key) {
+  if (!key) return false;
+  const m = load();
+  if (!(key in m)) return false;
+  delete m[key];
+  persist();
+  return true;
+}
+
+/**
+ * Remove every cached key that starts with `prefix`. Used for mutation-aware
+ * invalidation: after a write, the client drops the stale list/overview payloads
+ * it derived from the old state so the next render fetches fresh data instead of
+ * flashing a pre-mutation snapshot. Returns the number of entries removed.
+ */
+export function cacheInvalidatePrefix(prefix) {
+  if (!prefix) return 0;
+  const m = load();
+  let n = 0;
+  for (const k of Object.keys(m)) {
+    if (k.startsWith(prefix)) {
+      delete m[k];
+      n += 1;
+    }
+  }
+  if (n) persist();
+  return n;
+}
+
+/** Snapshot of the current cache keys (mainly for tests / debugging). */
+export function cacheKeys() {
+  return Object.keys(load());
+}
