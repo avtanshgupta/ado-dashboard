@@ -9,6 +9,7 @@ import { ReviewerManager } from '../components/ReviewerManager.jsx';
 import { WorkItemManager } from '../components/WorkItemManager.jsx';
 import { DiffView } from '../components/DiffView.jsx';
 import { TemplateMenu } from '../components/TemplateMenu.jsx';
+import { ReviewChecklist } from '../components/ReviewChecklist.jsx';
 import { fmtDate, repoShort, isGateInFlight, canRerunGate } from '../lib/format.js';
 import {
   ArrowLeft, GitMerge, RefreshCw, Zap, X, FilePenLine, Trash2, RotateCcw,
@@ -464,6 +465,12 @@ export function PrDetail() {
               <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>Participants: {pr.comments.participants.join(', ')}</div>
             )}
             <NewCommentBox repo={repo} id={id} onChanged={refetch} />
+            <ReviewChecklist
+              repo={repo}
+              id={id}
+              postComment={(content) => api.addComment(repo, id, content)}
+              onPosted={() => refetch(true)}
+            />
             {visibleThreads.length === 0 && <div className="muted">No {threadFilter === 'all' ? '' : threadFilter} discussions.</div>}
             {visibleThreads.map((t) => {
               const isOpen = expanded.has(t.id);
