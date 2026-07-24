@@ -888,6 +888,10 @@ a.kv:hover { background: var(--surface-2); }
 .bulk-bar .grow { flex: 1; }
 .bulk-count { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
 .pr-table tr.row-selected td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.bulk-inline { display: inline-flex; align-items: center; gap: 4px; }
+.bulk-assignee-pop { position: absolute; top: calc(100% + 4px); right: 0; z-index: 30; min-width: 240px; max-height: 260px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-lg); padding: 4px; }
+.bulk-assignee-item { display: block; width: 100%; text-align: left; padding: 6px 8px; border: none; background: none; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text); }
+.bulk-assignee-item:hover { background: var(--surface-2); }
 .btn.ghost { background: transparent; border-color: transparent; }
 .btn.ghost:hover { background: var(--surface-2); }
 

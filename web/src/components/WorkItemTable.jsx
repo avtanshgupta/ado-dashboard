@@ -41,14 +41,25 @@ function Th({ label, k, sort, setSort, align }) {
   );
 }
 
-export function WorkItemTable({ items, sort, setSort, typeColors = {}, density = 'comfortable', focusedKey = null, multiProject = false }) {
+export function WorkItemTable({ items, sort, setSort, typeColors = {}, density = 'comfortable', focusedKey = null, multiProject = false, selectable = false, selected, onToggleSelect, onToggleAll }) {
   const config = useConfig();
   const slaDays = config?.slaDays || 7;
+  const allSelected = selectable && items.length > 0 && items.every((wi) => selected?.has(String(wi.id)));
   return (
     <div className="table-wrap">
       <table className={`pr-table ${density === 'compact' ? 'compact' : ''}`} aria-label="Work items">
         <thead>
           <tr>
+            {selectable && (
+              <th scope="col" style={{ width: 30 }}>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  aria-label="Select all work items on this page"
+                  onChange={() => onToggleAll?.(items)}
+                />
+              </th>
+            )}
             <Th label="Type" k="type" sort={sort} setSort={setSort} />
             <Th label="Work item" k="title" sort={sort} setSort={setSort} />
             <Th label="State" k="state" sort={sort} setSort={setSort} />
@@ -62,7 +73,17 @@ export function WorkItemTable({ items, sort, setSort, typeColors = {}, density =
         </thead>
         <tbody>
           {items.map((wi) => (
-            <tr key={wi.id} className={focusedKey === String(wi.id) ? 'row-focus' : ''}>
+            <tr key={wi.id} className={`${selectable && selected?.has(String(wi.id)) ? 'row-selected' : ''} ${focusedKey === String(wi.id) ? 'row-focus' : ''}`}>
+              {selectable && (
+                <td style={{ textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={selected?.has(String(wi.id)) || false}
+                    aria-label={`Select work item ${wi.id}`}
+                    onChange={() => onToggleSelect?.(wi)}
+                  />
+                </td>
+              )}
               <td><WiTypeBadge type={wi.type} color={typeColors[wi.type]} /></td>
               <td className="pr-title-cell">
                 <Link className="title-link" to={`/work-item/${wi.id}`}>{wi.title}</Link>

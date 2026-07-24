@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useConfig } from '../lib/AppContext.jsx';
 import { useAsync } from '../lib/useAsync.js';
@@ -6,6 +6,7 @@ import { api } from '../lib/api.js';
 import { Loading, ErrorBox, Empty, Pager } from '../components/ui.jsx';
 import { WorkItemFilterBar } from '../components/WorkItemFilterBar.jsx';
 import { WorkItemTable } from '../components/WorkItemTable.jsx';
+import { BulkWorkItemBar } from '../components/BulkWorkItemBar.jsx';
 import { SavedViews } from '../components/SavedViews.jsx';
 import { applyWorkItemFilterSort, deriveWorkItemOptions } from '../lib/workItemFilters.js';
 import { Eye, ClipboardList, Users, Bell, CalendarClock, Settings } from '../components/icons.jsx';
@@ -40,6 +41,7 @@ export function WorkItemListPage({ variant }) {
   const [sort, setSort] = useState(() => loadPrefs().sort || { key: 'changedDate', dir: 'desc' });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPrefs().pageSize || 25);
+  const [selected, setSelected] = useState(new Set());
 
   const density = config.uiPrefs?.density || 'comfortable';
   const multiProject = (config.workItemProjects?.length || 0) > 1;
@@ -84,6 +86,28 @@ export function WorkItemListPage({ variant }) {
     return () => document.removeEventListener('keydown', onKey);
   }, [paged, focusIdx, navigate]);
   const focusedKey = focusIdx >= 0 && paged[focusIdx] ? String(paged[focusIdx].id) : null;
+
+  // A3 — bulk selection (keyed by work-item id), cleared when switching tab.
+  useEffect(() => { setSelected(new Set()); }, [variant]);
+  const toggleSelect = useCallback((wi) => {
+    setSelected((s) => {
+      const n = new Set(s);
+      const k = String(wi.id);
+      if (n.has(k)) n.delete(k); else n.add(k);
+      return n;
+    });
+  }, []);
+  const toggleAll = useCallback((rows) => {
+    setSelected((s) => {
+      const keys = rows.map((wi) => String(wi.id));
+      const allOn = keys.every((k) => s.has(k));
+      const n = new Set(s);
+      for (const k of keys) { if (allOn) n.delete(k); else n.add(k); }
+      return n;
+    });
+  }, []);
+  const clearSelect = useCallback(() => setSelected(new Set()), []);
+  const selectedItems = useMemo(() => shown.filter((wi) => selected.has(String(wi.id))), [shown, selected]);
 
   async function handleRefresh() { await api.refresh(); refetch(); }
 
@@ -136,7 +160,24 @@ export function WorkItemListPage({ variant }) {
         />
       ) : (
         <>
-          <WorkItemTable items={paged} sort={sort} setSort={setSort} typeColors={typeColors} density={density} focusedKey={focusedKey} multiProject={multiProject} />
+          <BulkWorkItemBar
+            items={selectedItems}
+            onClear={clearSelect}
+            onChanged={async () => { await api.refresh(); refetch(); }}
+          />
+          <WorkItemTable
+            items={paged}
+            sort={sort}
+            setSort={setSort}
+            typeColors={typeColors}
+            density={density}
+            focusedKey={focusedKey}
+            multiProject={multiProject}
+            selectable
+            selected={selected}
+            onToggleSelect={toggleSelect}
+            onToggleAll={toggleAll}
+          />
           <Pager page={curPage} pageSize={pageSize} total={shown.length} onPage={setPage} onPageSize={setPageSize} />
         </>
       )}
