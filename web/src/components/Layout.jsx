@@ -4,6 +4,7 @@ import { useConfig, useApp } from '../lib/AppContext.jsx';
 import { Avatar } from './ui.jsx';
 import { NotificationBell } from './NotificationBell.jsx';
 import { CommandPalette } from './CommandPalette.jsx';
+import { KeyboardShortcuts } from './KeyboardShortcuts.jsx';
 import { Tour } from './Tour.jsx';
 import { BrandMark } from './BrandMark.jsx';
 import { getThemePref, setThemePref } from '../lib/theme.js';
@@ -65,6 +66,7 @@ export function Layout() {
   return (
     <div className={`app ${collapsed ? 'nav-collapsed' : ''}`}>
       <CommandPalette onLogout={logout} onCycleTheme={cycleTheme} />
+      <KeyboardShortcuts />
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="brand">
@@ -140,6 +142,7 @@ export function Layout() {
                 <button className="um-item" onClick={() => { setMenuOpen(false); navigate('/settings'); }}><Settings size={15} /> Settings</button>
                 <button className="um-item" onClick={cycleTheme}>{(() => { const T = THEME_ICON[theme]; return <T size={15} />; })()} Theme: {THEME_LABEL[theme]}</button>
                 <button className="um-item" onClick={() => { setMenuOpen(false); window.dispatchEvent(new CustomEvent('ado-start-tour')); }}><Compass size={15} /> Take a tour</button>
+                <button className="um-item" onClick={() => { setMenuOpen(false); window.dispatchEvent(new CustomEvent('ado-show-shortcuts')); }}><kbd className="um-kbd">?</kbd> Keyboard shortcuts</button>
                 <button className="um-item" onClick={() => { setMenuOpen(false); logout(); }}><LogOut size={15} /> Sign out</button>
               </div>
             )}

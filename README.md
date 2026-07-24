@@ -83,6 +83,8 @@ against every org you can access.
 - **Filter / sort / search:** per-repo chips, multi-select state filter, time-range
   filter, sortable + paginated columns, free-text filter, **saved views**, and a
   global search (⌘K / Ctrl-K command palette; jump to a work item by `#id`).
+- **Keyboard-driven:** a `?` shortcuts overlay plus GitHub-style `g` navigation
+  (`g p` Pull Requests, `g w` Work Items, `g a` Agents, …).
 - **In-app notifications** with live updates over **Server-Sent Events**, an unread
   badge, per-event preferences, and optional desktop/browser push.
 - **Stand-up** generator (Markdown + `.ics`), CSV export, guided onboarding tour,
