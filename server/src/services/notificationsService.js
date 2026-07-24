@@ -4,7 +4,9 @@ import { config } from '../config.js';
 import { currentUser, currentConfig } from '../lib/context.js';
 import { writeJsonAtomic } from '../lib/atomicFile.js';
 import { snapshotState } from './prService.js';
+import { listDefinitions } from './pipelineService.js';
 import * as agentService from './agentSessionService.js';
+import { detectPipelineAlerts } from '../lib/pipelineWatch.js';
 
 const dataDir = join(config.dataDir, 'notif');
 
@@ -87,6 +89,7 @@ export async function poll() {
   if (!store.initialized) {
     store.snapshot = currentMap;
     seedAgentState(uid, cfg, store); // baseline so we don't alert on first load
+    await seedPipelineWatch(cfg, store); // baseline watched pipelines too
     store.initialized = true;
     save(uid, store);
     return { newItems: [], unread: getNotifications().unread };
@@ -152,11 +155,19 @@ export async function poll() {
     agentItems = [];
   }
 
+  // B4 — watched-pipeline failure alerts (async: reads latest runs).
+  let pipelineItems = [];
+  try {
+    pipelineItems = await detectPipelineWatchItems(cfg, store);
+  } catch {
+    pipelineItems = [];
+  }
+
   store.snapshot = currentMap;
-  store.items = [...agentItems, ...kept, ...(store.items || [])].slice(0, 500);
+  store.items = [...agentItems, ...pipelineItems, ...kept, ...(store.items || [])].slice(0, 500);
   save(uid, store);
 
-  return { newItems: [...agentItems, ...kept], unread: getNotifications().unread };
+  return { newItems: [...agentItems, ...pipelineItems, ...kept], unread: getNotifications().unread };
 }
 
 function agentThresholds(cfg) {
@@ -234,4 +245,55 @@ function detectAgentItems(userId, cfg, store) {
   store.agentSnapshot = snap;
   store.agentLongRun = stillLong; // drop ids that ended / are no longer long-running
   return items;
+}
+
+// --- B4: watched-pipeline failure alerts ---------------------------------------
+
+/** Fetch the latest run per watched pipeline (empty when nothing is watched). */
+async function watchedDefinitions(cfg) {
+  const watched = new Set((cfg.watchedPipelines || []).map(Number));
+  if (watched.size === 0) return { watched, defs: [] };
+  const all = await listDefinitions({ withLatest: true });
+  return { watched, defs: all.filter((d) => watched.has(Number(d.definitionId))) };
+}
+
+/** Baseline the watched-pipeline run snapshot so the first poll doesn't alert. */
+async function seedPipelineWatch(cfg, store) {
+  try {
+    const { watched, defs } = await watchedDefinitions(cfg);
+    if (watched.size === 0) { store.pipelineSnapshot = {}; return; }
+    const { snapshot } = detectPipelineAlerts({}, defs.map(toWatchDef), watched);
+    store.pipelineSnapshot = snapshot;
+  } catch {
+    store.pipelineSnapshot = store.pipelineSnapshot || {};
+  }
+}
+
+/** Normalize a listDefinitions entry to the shape detectPipelineAlerts expects. */
+function toWatchDef(d) {
+  return {
+    definitionId: d.definitionId,
+    name: d.label || d.name,
+    webUrl: d.webUrl,
+    lastRun: d.lastRun ? { id: d.lastRun.id, result: d.lastRun.result, webUrl: d.lastRun.webUrl } : null,
+  };
+}
+
+/** Detect new failed runs on watched pipelines since the last poll. */
+async function detectPipelineWatchItems(cfg, store) {
+  const prefs = cfg.notificationPrefs || {};
+  if (!prefs.pipelineWatchFailed) return [];
+  const { watched, defs } = await watchedDefinitions(cfg);
+  if (watched.size === 0) return [];
+  const { alerts, snapshot } = detectPipelineAlerts(store.pipelineSnapshot || {}, defs.map(toWatchDef), watched);
+  store.pipelineSnapshot = snapshot;
+  return alerts.map((a) => ({
+    id: `pipeline-watch:${a.definitionId}:${a.runId}`,
+    type: 'pipeline-watch-failed',
+    repo: a.name, // shown as the badge
+    message: `Watched pipeline “${a.name}” had a failed run (${a.result}).`,
+    webUrl: a.webUrl,
+    timestamp: new Date().toISOString(),
+    read: false,
+  }));
 }

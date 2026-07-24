@@ -594,6 +594,9 @@ button.subtab { background: none; border: none; border-bottom: 2px solid transpa
 .review-checklist-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
 .review-checklist-edit { flex: 1; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
 .review-checklist-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.watch-star { color: var(--text-subtle); }
+.watch-star.on { color: #f59e0b; }
+.watch-star:hover { color: #f59e0b; }
 @media (max-width: 480px) {
   /* Stack the label/value inputs above the remove button on very narrow screens. */
   .group-row { grid-template-columns: 1fr 1fr; }

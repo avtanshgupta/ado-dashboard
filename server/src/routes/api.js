@@ -99,6 +99,7 @@ function buildConfigResponse(cfg) {
     slaDays: cfg.slaDays,
     agents: cfg.agents,
     workItemSavedQueries: cfg.workItemSavedQueries,
+    watchedPipelines: cfg.watchedPipelines,
     workItemProjects: cfg.workItemProjects,
     defaults: config.defaults,
   };

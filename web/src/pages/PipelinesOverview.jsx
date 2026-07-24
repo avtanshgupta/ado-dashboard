@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useConfig } from '../lib/AppContext.jsx';
+import { useConfig, useApp } from '../lib/AppContext.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { api } from '../lib/api.js';
-import { Loading, ErrorBox, Empty, RunStatusBadge } from '../components/ui.jsx';
+import { Loading, ErrorBox, Empty, RunStatusBadge, useToast } from '../components/ui.jsx';
 import { PipelineTrendChart } from '../components/Charts.jsx';
 import { repoShort, timeAgo, fmtDuration } from '../lib/format.js';
 import {
   LayoutDashboard, Play, Activity, RefreshCw, CheckCircle2, GitBranch,
-  LineChart, Dices, Inbox,
+  LineChart, Dices, Inbox, Star,
 } from '../components/icons.jsx';
 
 const RANGES = [
@@ -40,7 +40,7 @@ function RunRow({ r }) {
   );
 }
 
-function PipelineHealthCard({ p }) {
+function PipelineHealthCard({ p, watched, onToggleWatch }) {
   const last = p.lastRun;
   return (
     <div className="card card-pad">
@@ -49,7 +49,17 @@ function PipelineHealthCard({ p }) {
           <strong style={{ fontSize: 14 }}>{p.name}</strong>
           <div className="muted" style={{ fontSize: 12 }}>{repoShort(p.repo)}</div>
         </div>
-        {last ? <RunStatusBadge status={last.status} /> : <span className="muted">no runs</span>}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <button
+            className={`btn-icon watch-star ${watched ? 'on' : ''}`}
+            onClick={() => onToggleWatch(p.definitionId)}
+            title={watched ? 'Unwatch — stop failure alerts' : 'Watch — get notified on a failed run'}
+            aria-pressed={watched}
+          >
+            <Star size={15} />
+          </button>
+          {last ? <RunStatusBadge status={last.status} /> : <span className="muted">no runs</span>}
+        </div>
       </div>
       {last && (
         <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
@@ -172,9 +182,25 @@ function AnalyticsSection({ defs, months }) {
 
 export function PipelinesOverview() {
   const config = useConfig();
+  const { reloadConfig } = useApp();
+  const toast = useToast();
   const [months, setMonths] = useState(config.defaultTimeRangeMonths || 6);
   const overview = useAsync(() => api.pipelineOverview(months), [months], { pollMs: 30000, cacheKey: `pl:overview:${months}` });
   const defs = useAsync(() => api.pipelineDefs(true), [], { pollMs: 60000, cacheKey: 'pl:defs' });
+  const watched = new Set((config.watchedPipelines || []).map(Number));
+
+  async function toggleWatch(definitionId) {
+    const id = Number(definitionId);
+    const next = new Set(watched);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    try {
+      await api.updateConfig({ watchedPipelines: [...next] });
+      await reloadConfig();
+      toast.success(next.has(id) ? 'Watching pipeline — you\'ll be alerted on failures' : 'Stopped watching pipeline');
+    } catch (e) {
+      toast.error(`Couldn't update watch: ${e.message}`);
+    }
+  }
 
   return (
     <div>
@@ -219,7 +245,7 @@ export function PipelinesOverview() {
           <Empty Icon={Activity} label="No pipelines configured — add some in Settings" />
         ) : (
           <div className="grid cols-3">
-            {defs.data.map((p) => <PipelineHealthCard key={p.definitionId} p={p} />)}
+            {defs.data.map((p) => <PipelineHealthCard key={p.definitionId} p={p} watched={watched.has(Number(p.definitionId))} onToggleWatch={toggleWatch} />)}
           </div>
         )}
       </div>

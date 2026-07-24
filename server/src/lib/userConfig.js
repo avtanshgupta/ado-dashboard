@@ -36,6 +36,7 @@ export const DEFAULT_NOTIF_PREFS = {
   prClosed: false,
   agentOffline: false, // a reporting machine went stale/offline
   agentLongRunning: false, // a session exceeded the long-running threshold
+  pipelineWatchFailed: false, // B4 — a watched pipeline had a new failed run
   browserPush: false, // C2 — desktop/browser notifications
 };
 
@@ -88,6 +89,7 @@ function seed() {
     uiPrefs: { ...DEFAULT_UI_PREFS }, // E5
     slaDays: DEFAULT_SLA_DAYS, // B4
     workItemSavedQueries: [], // WI — saved ADO WIQL query ids to run in the Queries tab
+    watchedPipelines: [], // B4 — definitionIds to alert on when a run fails
     agents: { ...DEFAULT_AGENT_PREFS }, // Copilot agent session thresholds
   };
 }
@@ -156,6 +158,7 @@ export function loadUserConfig(userId) {
     uiPrefs: { ...DEFAULT_UI_PREFS, ...(stored.uiPrefs || {}) },
     slaDays: Number.isInteger(stored.slaDays) ? stored.slaDays : DEFAULT_SLA_DAYS,
     workItemSavedQueries: Array.isArray(stored.workItemSavedQueries) ? stored.workItemSavedQueries : [],
+    watchedPipelines: Array.isArray(stored.watchedPipelines) ? stored.watchedPipelines : [],
     agents: { ...DEFAULT_AGENT_PREFS, ...(stored.agents && typeof stored.agents === 'object' && !Array.isArray(stored.agents) ? stored.agents : {}) },
   };
 }
@@ -163,7 +166,7 @@ export function loadUserConfig(userId) {
 const ALLOWED_KEYS = [
   'projects', 'repositories', 'repoProjects', 'team', 'reviewerGroups', 'defaultTimeRangeMonths', 'pipelines', 'notificationPrefs',
   'commentTemplates', 'prTemplates', 'savedViews', 'mutedRepos', 'uiPrefs', 'slaDays',
-  'workItemSavedQueries', 'agents',
+  'workItemSavedQueries', 'watchedPipelines', 'agents',
 ];
 
 const KNOWN_PREF_KEYS = new Set(Object.keys(DEFAULT_NOTIF_PREFS));
@@ -301,6 +304,21 @@ function validateAndNormalize(partial) {
 
   if (partial.projects !== undefined) clean.projects = validateProjects(partial.projects);
   if (partial.workItemSavedQueries !== undefined) clean.workItemSavedQueries = validateSavedQueries(partial.workItemSavedQueries);
+
+  if (partial.watchedPipelines !== undefined) {
+    if (!Array.isArray(partial.watchedPipelines)) throw badRequest('watchedPipelines must be an array.');
+    if (partial.watchedPipelines.length > 100) throw badRequest('Too many watched pipelines (max 100).');
+    const seen = new Set();
+    const out = [];
+    for (const v of partial.watchedPipelines) {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n <= 0) throw badRequest('watchedPipelines must contain positive pipeline definitionIds.');
+      if (seen.has(n)) continue;
+      seen.add(n);
+      out.push(n);
+    }
+    clean.watchedPipelines = out;
+  }
 
   if (partial.agents !== undefined) {
     const a = partial.agents;
@@ -497,6 +515,7 @@ export function effectiveConfig(user) {
     slaDays: uc.slaDays || DEFAULT_SLA_DAYS,
     agents: { ...DEFAULT_AGENT_PREFS, ...(uc.agents || {}) },
     workItemSavedQueries: uc.workItemSavedQueries || [],
+    watchedPipelines: uc.watchedPipelines || [],
     // WI is scoped to the monitored projects (name + id + org).
     workItemProjects: projects.map((p) => ({ name: p.name, id: p.id, org: p.org || DEFAULT_ORG })),
     raw: uc,

@@ -147,6 +147,7 @@ const PREF_LABELS = {
   prClosed: 'PR merged or closed',
   agentOffline: 'Agent machine went stale / offline',
   agentLongRunning: 'Long-running agent sessions',
+  pipelineWatchFailed: 'Watched pipeline failed (★ pipelines)',
   browserPush: 'Desktop / browser notifications',
 };
 
