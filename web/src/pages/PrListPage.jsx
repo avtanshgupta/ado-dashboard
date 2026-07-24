@@ -113,7 +113,7 @@ export function PrListPage({ variant }) {
     filters.states.length > 0 && filters.states.every((s) => s === 'Open' || s === 'Draft');
   const fetchArg = variant === 'created' && cfg.historyByState && !activeOnly ? 'all' : undefined;
 
-  const { data, loading, error, refetch, revalidating } = useAsync(
+  const { data, loading, error, refetch, revalidating, updatedAt } = useAsync(
     () => cfg.fetch(fetchArg),
     [variant, fetchArg],
     { pollMs: 90000, cacheKey: `pr:list:${variant}:${fetchArg || 'active'}` }
@@ -212,6 +212,7 @@ export function PrListPage({ variant }) {
         showStateFilter={cfg.showStateFilter}
         labels={availableLabels}
         revalidating={revalidating}
+        updatedAt={updatedAt}
         extra={
           <SavedViews
             variant={variant}

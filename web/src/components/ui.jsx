@@ -211,6 +211,25 @@ export function RefreshingTag({ show, label = 'Updating…' }) {
   );
 }
 
+/**
+ * "Updated Ns ago" freshness indicator (A6). Pass the `updatedAt` epoch ms from
+ * useAsync; it ticks itself so the label stays current. Hidden until the first
+ * successful load. Suppressed while `revalidating` so it doesn't fight the
+ * RefreshingTag pill.
+ */
+export function Freshness({ updatedAt, revalidating = false }) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!updatedAt) return undefined;
+    const iv = setInterval(() => force((n) => n + 1), 15000);
+    return () => clearInterval(iv);
+  }, [updatedAt]);
+  if (!updatedAt || revalidating) return null;
+  const secs = Math.max(0, Math.round((Date.now() - updatedAt) / 1000));
+  const label = secs < 5 ? 'just now' : secs < 60 ? `${secs}s ago` : secs < 3600 ? `${Math.round(secs / 60)}m ago` : `${Math.round(secs / 3600)}h ago`;
+  return <span className="freshness-tag muted" title="When this view last loaded fresh data">Updated {label}</span>;
+}
+
 export function Empty({ Icon = Inbox, label = 'Nothing here', action = null }) {
   return (
     <div className="empty">

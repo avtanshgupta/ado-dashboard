@@ -3,10 +3,10 @@ import { TIME_RANGES } from '../lib/filters.js';
 import { api } from '../lib/api.js';
 import { shortPath } from '../lib/format.js';
 import { MultiSelect } from './MultiSelect.jsx';
-import { RefreshingTag } from './ui.jsx';
+import { RefreshingTag, Freshness } from './ui.jsx';
 import { ArrowUp, ArrowDown, RefreshCw, Download, Printer, ListFilter } from './icons.jsx';
 
-export function WorkItemFilterBar({ filters, setFilters, sort, setSort, options, total, shown, onRefresh, exportTab, multiProject, revalidating }) {
+export function WorkItemFilterBar({ filters, setFilters, sort, setSort, options, total, shown, onRefresh, exportTab, multiProject, revalidating, updatedAt = null }) {
   const toggle = (key) => (val) =>
     setFilters((f) => {
       const cur = f[key] || [];
@@ -52,6 +52,7 @@ export function WorkItemFilterBar({ filters, setFilters, sort, setSort, options,
 
       <div className="grow" />
       <RefreshingTag show={revalidating} />
+      <Freshness updatedAt={updatedAt} revalidating={revalidating} />
       <span className="result-count"><ListFilter size={13} /> {shown} of {total}</span>
       {onRefresh && <button className="btn sm" onClick={onRefresh} title="Refresh data"><RefreshCw size={14} /> Refresh</button>}
       {exportTab && <a className="btn sm" href={api.wiExportUrl(exportTab)} title="Export CSV"><Download size={14} /> CSV</a>}

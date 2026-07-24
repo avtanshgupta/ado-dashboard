@@ -8,7 +8,7 @@ import { PipelineTrendChart } from '../components/Charts.jsx';
 import { repoShort, timeAgo, fmtDuration } from '../lib/format.js';
 import {
   LayoutDashboard, Play, Activity, RefreshCw, CheckCircle2, GitBranch,
-  LineChart, Dices, Inbox, Star,
+  LineChart, Dices, Inbox, Star, Plus,
 } from '../components/icons.jsx';
 
 const RANGES = [
@@ -242,7 +242,7 @@ export function PipelinesOverview() {
         ) : defs.error ? (
           <ErrorBox error={defs.error} onRetry={defs.refetch} />
         ) : (defs.data || []).length === 0 ? (
-          <Empty Icon={Activity} label="No pipelines configured — add some in Settings" />
+          <Empty Icon={Activity} label="No pipelines configured yet" action={<Link className="btn sm accent" to="/settings"><Plus size={14} /> Add a pipeline in Settings</Link>} />
         ) : (
           <div className="grid cols-3">
             {defs.data.map((p) => <PipelineHealthCard key={p.definitionId} p={p} watched={watched.has(Number(p.definitionId))} onToggleWatch={toggleWatch} />)}

@@ -54,7 +54,7 @@ export function WorkItemListPage({ variant }) {
   }, [variant]);
 
   const fetchFn = cfg.sprint ? () => api.wiSprint(sprintScope) : cfg.fetch;
-  const { data, loading, error, refetch, revalidating } = useAsync(
+  const { data, loading, error, refetch, revalidating, updatedAt } = useAsync(
     fetchFn,
     [variant, cfg.sprint ? sprintScope : null],
     { pollMs: 90000, cacheKey: `wi:list:${variant}:${cfg.sprint ? sprintScope : ''}` }
@@ -138,6 +138,7 @@ export function WorkItemListPage({ variant }) {
         exportTab={cfg.exportTab}
         multiProject={multiProject}
         revalidating={revalidating}
+        updatedAt={updatedAt}
       />
       <div className="filter-bar no-print" style={{ paddingTop: 0 }}>
         <SavedViews

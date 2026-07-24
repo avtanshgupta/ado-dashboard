@@ -26,6 +26,7 @@ export function useAsync(fn, deps = [], { pollMs, cacheKey } = {}) {
     loading: initial === undefined,
     error: null,
     revalidating: false,
+    updatedAt: initial !== undefined ? null : null,
   });
   const fnRef = useRef(fn);
   fnRef.current = fn;
@@ -65,7 +66,7 @@ export function useAsync(fn, deps = [], { pollMs, cacheKey } = {}) {
       const data = await fnRef.current();
       if (mounted.current && myRun === runIdRef.current) {
         if (cacheKeyRef.current) cacheSet(cacheKeyRef.current, data);
-        setState({ data, loading: false, error: null, revalidating: false });
+        setState({ data, loading: false, error: null, revalidating: false, updatedAt: Date.now() });
       }
     } catch (error) {
       if (mounted.current && myRun === runIdRef.current) setState((s) => ({ ...s, loading: false, revalidating: false, error }));

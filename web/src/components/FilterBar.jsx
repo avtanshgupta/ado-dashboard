@@ -1,7 +1,7 @@
 import { STATE_OPTIONS, SORT_OPTIONS, TIME_RANGES } from '../lib/filters.js';
 import { api } from '../lib/api.js';
 import { MultiSelect } from './MultiSelect.jsx';
-import { RefreshingTag } from './ui.jsx';
+import { RefreshingTag, Freshness } from './ui.jsx';
 import { Tag, ArrowUp, ArrowDown, RefreshCw, Download, Printer } from './icons.jsx';
 
 export function FilterBar({
@@ -19,6 +19,7 @@ export function FilterBar({
   labels = [],
   extra = null,
   revalidating = false,
+  updatedAt = null,
 }) {
   const toggle = (key) => (val) =>
     setFilters((f) => {
@@ -102,6 +103,7 @@ export function FilterBar({
 
       <div className="grow" />
       <RefreshingTag show={revalidating} />
+      <Freshness updatedAt={updatedAt} revalidating={revalidating} />
       <span className="result-count">
         {shown} of {total}
       </span>

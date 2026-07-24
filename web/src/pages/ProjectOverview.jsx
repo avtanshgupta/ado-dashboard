@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useConfig } from '../lib/AppContext.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { api } from '../lib/api.js';
-import { Loading, ErrorBox, StateBadge, PipelineBadge, ReviewBadge, RunStatusBadge, TimeAgo, IdleTag, Avatar, useToast, RefreshingTag } from '../components/ui.jsx';
+import { Loading, ErrorBox, StateBadge, PipelineBadge, ReviewBadge, RunStatusBadge, TimeAgo, IdleTag, Avatar, useToast, RefreshingTag, Freshness } from '../components/ui.jsx';
 import { MergeModal } from '../components/actions.jsx';
 import { WiTypeBadge, WiStateBadge } from '../components/workItemUi.jsx';
 import { repoShort, PIPELINE_COLORS } from '../lib/format.js';
@@ -228,7 +228,7 @@ function WorkItemsCard({ data }) {
 export function ProjectOverview() {
   const config = useConfig();
   const toast = useToast();
-  const { data, loading, error, refetch, revalidating } = useAsync(() => api.summary(), [], { pollMs: 90000, cacheKey: 'overview:summary' });
+  const { data, loading, error, refetch, revalidating, updatedAt } = useAsync(() => api.summary(), [], { pollMs: 90000, cacheKey: 'overview:summary' });
   const wi = useAsync(() => api.wiSummary(), [], { pollMs: 120000, cacheKey: 'wi:summary' });
   const [mergeTarget, setMergeTarget] = useState(null);
 
@@ -250,6 +250,7 @@ export function ProjectOverview() {
           <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{summaryLine}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Freshness updatedAt={updatedAt} revalidating={revalidating || wi.revalidating} />
           <RefreshingTag show={revalidating || wi.revalidating} />
           <Link className="btn sm" to="/pull-requests/new"><Plus size={14} /> New PR</Link>
           <Link className="btn sm" to="/work-items/new"><Plus size={14} /> New Work Item</Link>
