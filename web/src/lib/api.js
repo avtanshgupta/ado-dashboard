@@ -107,6 +107,7 @@ export const api = {
   config: () => req('/config'),
   updateConfig: (patch) => req('/config', { method: 'PUT', body: patch }),
   audit: (limit = 100) => req(`/audit?limit=${limit}`),
+  auditStats: () => req('/audit/stats'),
   projects: () => req('/projects'),
   repoResolve: (ref) => req(`/repos/resolve?ref=${encodeURIComponent(ref)}`),
   projectResolve: (ref) => req(`/projects/resolve?ref=${encodeURIComponent(ref)}`),

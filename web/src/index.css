@@ -548,6 +548,14 @@ button.subtab { background: none; border: none; border-bottom: 2px solid transpa
 .partial-banner { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 13px; background: color-mix(in srgb, #f59e0b 14%, var(--surface)); border-bottom: 1px solid color-mix(in srgb, #f59e0b 40%, var(--border)); color: var(--text); }
 .partial-banner-close { margin-left: auto; background: none; border: none; cursor: pointer; color: var(--text-muted); display: inline-flex; padding: 2px; border-radius: 4px; }
 .partial-banner-close:hover { background: color-mix(in srgb, #f59e0b 20%, transparent); }
+.perf-summary { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; }
+.perf-stat { display: flex; flex-direction: column; }
+.perf-stat .perf-num { font-size: 18px; font-weight: 700; }
+.perf-stat .perf-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.perf-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.perf-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.perf-table td { padding: 5px 6px; border-bottom: 1px solid var(--border-muted); }
+.perf-table .mono { font-family: var(--mono, monospace); }
 @media (max-width: 480px) {
   /* Stack the label/value inputs above the remove button on very narrow screens. */
   .group-row { grid-template-columns: 1fr 1fr; }

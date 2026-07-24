@@ -218,6 +218,7 @@ export function Settings() {
   const [templates, setTemplates] = useState(config.commentTemplates || []); // A4
   const [prTemplates, setPrTemplates] = useState(config.prTemplates || []); // C1
   const [audit, setAudit] = useState(null); // B2 — recent state-changing actions
+  const [auditStats, setAuditStats] = useState(null); // C5 — latency/error stats
   const [slaDays, setSlaDays] = useState(config.slaDays || 7); // B4
   const [density, setDensity] = useState(config.uiPrefs?.density || 'comfortable'); // E5
   const [timezone, setTimezone] = useState(config.uiPrefs?.timezone || DEFAULT_TIME_ZONE);
@@ -257,6 +258,7 @@ export function Settings() {
   useEffect(() => {
     let stop = false;
     api.audit(50).then((r) => { if (!stop) setAudit(r.value || []); }).catch(() => { if (!stop) setAudit([]); });
+    api.auditStats().then((r) => { if (!stop) setAuditStats(r); }).catch(() => { if (!stop) setAuditStats(null); });
     return () => { stop = true; };
   }, []);
 
@@ -946,6 +948,41 @@ mv ~/Downloads/copilot-session-reporter.py ~/
                   onChange={importSettingsFile}
                 />
               </div>
+            </div>
+          )}
+
+          {section === 'account' && auditStats && auditStats.total > 0 && (
+            <div className="card card-pad" style={{ marginTop: 16 }}>
+              <h3 className="settings-section-head">Performance</h3>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                Response latency for your recent state-changing requests, derived from your local
+                audit trail. p50/p95/p99 are percentiles across the last {auditStats.total} actions.
+              </div>
+              <div className="perf-summary">
+                <div className="perf-stat"><span className="perf-num">{auditStats.total}</span><span className="perf-lbl">requests</span></div>
+                <div className="perf-stat"><span className="perf-num">{Math.round(auditStats.p50)}ms</span><span className="perf-lbl">p50</span></div>
+                <div className="perf-stat"><span className="perf-num">{Math.round(auditStats.p95)}ms</span><span className="perf-lbl">p95</span></div>
+                <div className="perf-stat"><span className="perf-num">{Math.round(auditStats.p99)}ms</span><span className="perf-lbl">p99</span></div>
+                <div className="perf-stat"><span className="perf-num">{(auditStats.errorRate * 100).toFixed(1)}%</span><span className="perf-lbl">errors</span></div>
+              </div>
+              {auditStats.routes.length > 0 && (
+                <table className="perf-table">
+                  <thead>
+                    <tr><th>Route</th><th style={{ textAlign: 'right' }}>Count</th><th style={{ textAlign: 'right' }}>p50</th><th style={{ textAlign: 'right' }}>p95</th><th style={{ textAlign: 'right' }}>Errors</th></tr>
+                  </thead>
+                  <tbody>
+                    {auditStats.routes.slice(0, 12).map((r) => (
+                      <tr key={`${r.method} ${r.route}`}>
+                        <td><span className="badge" style={{ minWidth: 46, textAlign: 'center' }}>{r.method}</span> <span className="mono" style={{ fontSize: 12 }}>{r.route}</span></td>
+                        <td style={{ textAlign: 'right' }}>{r.count}</td>
+                        <td style={{ textAlign: 'right' }}>{Math.round(r.p50)}ms</td>
+                        <td style={{ textAlign: 'right' }}>{Math.round(r.p95)}ms</td>
+                        <td style={{ textAlign: 'right', color: r.errors ? 'var(--danger, #c00)' : 'inherit' }}>{r.errors}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
 
