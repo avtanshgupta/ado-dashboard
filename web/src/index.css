@@ -556,6 +556,24 @@ button.subtab { background: none; border: none; border-bottom: 2px solid transpa
 .perf-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); padding: 4px 6px; border-bottom: 1px solid var(--border); }
 .perf-table td { padding: 5px 6px; border-bottom: 1px solid var(--border-muted); }
 .perf-table .mono { font-family: var(--mono, monospace); }
+/* ---- My Work home ---- */
+.mywork-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.mywork-widget { padding: 0; overflow: hidden; }
+.mywork-widget-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border-muted); }
+.mywork-widget-head h3 { margin: 0; font-size: 14px; display: inline-flex; align-items: center; gap: 7px; }
+.mywork-viewall { margin-left: auto; font-size: 12px; text-decoration: none; color: var(--accent); display: inline-flex; align-items: center; gap: 2px; }
+.mywork-widget-body { padding: 10px 14px 14px; }
+.mywork-count { font-size: 13px; margin-bottom: 8px; }
+.mywork-count strong { font-size: 20px; }
+.mywork-empty { font-size: 13px; color: var(--text-muted); }
+.mywork-row { display: block; padding: 6px 0; border-top: 1px solid var(--border-muted); text-decoration: none; color: var(--text); }
+.mywork-row:hover .mywork-row-title { color: var(--accent); }
+.mywork-row-title { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mywork-row-meta { display: block; font-size: 11.5px; }
+.mywork-agent-line { font-size: 12.5px; }
+.mywork-editor-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; }
+.mywork-editor-title { flex: 1; font-size: 13px; }
+.mywork-empty-all { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; }
 @media (max-width: 480px) {
   /* Stack the label/value inputs above the remove button on very narrow screens. */
   .group-row { grid-template-columns: 1fr 1fr; }

@@ -4,7 +4,7 @@ import { api } from '../lib/api.js';
 import {
   Zap, LayoutDashboard, GitPullRequestArrow, Eye, UserCheck, Users,
   Workflow, Settings, Search, Sun, LogOut, RefreshCw, ClipboardList, CalendarClock,
-  Bot, Play, SlidersHorizontal,
+  Bot, Play, SlidersHorizontal, ListTodo,
 } from './icons.jsx';
 import { trapFocus } from './focusTrap.js';
 
@@ -27,6 +27,7 @@ export function CommandPalette({ onLogout, onCycleTheme, onToggleDensity }) {
     () => [
       { id: 'ac', label: 'Go to Action Center', hint: 'what needs you', Icon: Zap, run: () => navigate('/action-center') },
       { id: 'overview', label: 'Go to Dashboard', hint: 'dashboard home', Icon: LayoutDashboard, run: () => navigate('/') },
+      { id: 'mywork', label: 'Go to My Work', hint: 'personalized home', Icon: ListTodo, run: () => navigate('/my-work') },
       { id: 'created', label: 'My Pull Requests', hint: 'PRs I authored', Icon: GitPullRequestArrow, run: () => navigate('/pull-requests/created') },
       { id: 'pr-new', label: 'New Pull Request', hint: 'create a PR', Icon: GitPullRequestArrow, run: () => navigate('/pull-requests/new') },
       { id: 'assigned', label: 'Assigned to Me', hint: 'PRs to review', Icon: Eye, run: () => navigate('/pull-requests/assigned') },

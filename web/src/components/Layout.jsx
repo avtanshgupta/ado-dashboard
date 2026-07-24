@@ -11,7 +11,7 @@ import { BrandMark } from './BrandMark.jsx';
 import { getThemePref, setThemePref } from '../lib/theme.js';
 import {
   LayoutDashboard, GitPullRequest, Workflow, Settings,
-  Search, Menu, Sun, Moon, Monitor, LogOut, Zap, ChevronsLeft, ChevronsRight, Compass, ClipboardList, Bot, TriangleAlert, X,
+  Search, Menu, Sun, Moon, Monitor, LogOut, Zap, ChevronsLeft, ChevronsRight, Compass, ClipboardList, Bot, TriangleAlert, X, ListTodo,
 } from './icons.jsx';
 
 const THEME_CYCLE = { system: 'light', light: 'dark', dark: 'system' };
@@ -20,6 +20,7 @@ const THEME_LABEL = { system: 'System', light: 'Light', dark: 'Dark' };
 
 const NAV = [
   { to: '/', Icon: LayoutDashboard, label: 'Dashboard', end: true, tour: 'dashboard' },
+  { to: '/my-work', Icon: ListTodo, label: 'My Work', tour: 'my-work' },
   { to: '/action-center', Icon: Zap, label: 'Action Center', tour: 'action-center' },
   { to: '/pull-requests', Icon: GitPullRequest, label: 'Pull Requests', tour: 'pull-requests' },
   { to: '/work-items', Icon: ClipboardList, label: 'Work Items', tour: 'work-items' },
