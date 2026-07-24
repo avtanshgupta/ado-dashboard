@@ -4,6 +4,7 @@ import { useToast } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
 import { fmtDate, fmtDateShort, COMMON_TIME_ZONES, DEFAULT_TIME_ZONE } from '../lib/format.js';
 import { Settings as SettingsIcon, Save, X, SlidersHorizontal, Users, Workflow, ClipboardList, Bell, MessageSquare, CircleUser, Bot, Download, Trash2, Check, Terminal, Plus, SquarePen } from '../components/icons.jsx';
+import { buildExport, parseImport } from '../lib/configPortability.js';
 
 /**
  * Inline-editable display label. Shows the value with a pencil; clicking reveals
@@ -167,6 +168,37 @@ export function Settings() {
   const config = useConfig();
   const { reloadConfig } = useApp();
   const toast = useToast();
+  const importFileRef = useRef(null);
+
+  function exportSettings() {
+    const bundle = buildExport(config);
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ado-dashboard-settings-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success('Settings exported');
+  }
+
+  async function importSettingsFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // let the same file be chosen again later
+    if (!file) return;
+    try {
+      const settings = parseImport(await file.text());
+      const count = Object.keys(settings).length;
+      if (!window.confirm(`Import ${count} settings group${count === 1 ? '' : 's'}? This overwrites your current values for those groups.`)) return;
+      await api.updateConfig(settings);
+      toast.success('Settings imported — reloading…');
+      setTimeout(() => window.location.reload(), 600);
+    } catch (err) {
+      toast.error(err.message || 'Import failed');
+    }
+  }
 
   const [repos, setRepos] = useState(config.repositories);
   const [repoProjects, setRepoProjects] = useState(config.repoProjects || {});
@@ -891,6 +923,28 @@ mv ~/Downloads/copilot-session-reporter.py ~/
               <div className="kv"><span className="k">Default project</span><span className="v">{config.project}</span></div>
               <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>
                 You act with your own Azure DevOps permissions. Settings on this page are personal to you.
+              </div>
+            </div>
+          )}
+
+          {section === 'account' && (
+            <div className="card card-pad" style={{ marginTop: 16 }}>
+              <h3 className="settings-section-head">Backup &amp; restore</h3>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                Export your personal settings — monitored projects, repos, pipelines, saved queries,
+                templates, saved views, thresholds and preferences — to a JSON file, or import a file
+                to restore them on another instance. Your identity and tokens are never included.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn" onClick={exportSettings}><Download size={14} /> Export settings</button>
+                <button className="btn" onClick={() => importFileRef.current?.click()}><Save size={14} /> Import settings…</button>
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept="application/json,.json"
+                  style={{ display: 'none' }}
+                  onChange={importSettingsFile}
+                />
               </div>
             </div>
           )}

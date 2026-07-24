@@ -242,6 +242,8 @@ persists to `server/data/users/<your-id>.json`:
   **muted repos**, and notification preferences.
 - **Recent activity** — your own audit trail of state-changing actions (under
   *Settings → Account*).
+- **Backup & restore** — export all your personal settings to a JSON file and
+  import them on another instance (*Settings → Account*); identity/tokens excluded.
 
 > **Pipelines**, **work-item saved queries**, and **review-group aliases** can be
 > **renamed inline** (✎) to a friendly display label; **projects** and **repos** are
