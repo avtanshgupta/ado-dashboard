@@ -574,6 +574,17 @@ button.subtab { background: none; border: none; border-bottom: 2px solid transpa
 .mywork-editor-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; }
 .mywork-editor-title { flex: 1; font-size: 13px; }
 .mywork-empty-all { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+/* ---- Insights ---- */
+.insights-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.insights-stat { padding: 14px 16px; }
+.insights-stat-value { font-size: 26px; font-weight: 700; line-height: 1.1; }
+.insights-stat-label { font-size: 13px; margin-top: 2px; }
+.insights-stat-sub { font-size: 11.5px; }
+.insights-highlights { margin: 4px 0 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.insights-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.insights-chart-head { display: flex; align-items: center; margin-bottom: 8px; }
+.insights-chart-head h3 { margin: 0; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.insights-chart-head .mywork-viewall { margin-left: auto; }
 @media (max-width: 480px) {
   /* Stack the label/value inputs above the remove button on very narrow screens. */
   .group-row { grid-template-columns: 1fr 1fr; }

@@ -4,7 +4,7 @@ import { api } from '../lib/api.js';
 import {
   Zap, LayoutDashboard, GitPullRequestArrow, Eye, UserCheck, Users,
   Workflow, Settings, Search, Sun, LogOut, RefreshCw, ClipboardList, CalendarClock,
-  Bot, Play, SlidersHorizontal, ListTodo,
+  Bot, Play, SlidersHorizontal, ListTodo, LineChart,
 } from './icons.jsx';
 import { trapFocus } from './focusTrap.js';
 
@@ -39,6 +39,7 @@ export function CommandPalette({ onLogout, onCycleTheme, onToggleDensity }) {
       { id: 'wi-sprint', label: 'Current Sprint', hint: 'active iteration', Icon: CalendarClock, run: () => navigate('/work-items/sprint') },
       { id: 'wi-new', label: 'New Work Item', hint: 'create a work item', Icon: ClipboardList, run: () => navigate('/work-items/new') },
       { id: 'pipelines', label: 'Go to Pipelines', hint: 'runs & analytics', Icon: Workflow, run: () => navigate('/pipelines') },
+      { id: 'insights', label: 'Go to Insights', hint: 'cross-area digest', Icon: LineChart, run: () => navigate('/insights') },
       { id: 'pl-trigger', label: 'Trigger a Pipeline', hint: 'run a build', Icon: Play, run: () => navigate('/pipelines/trigger') },
       { id: 'agents', label: 'Go to Agents', hint: 'Copilot sessions', Icon: Bot, run: () => navigate('/agents') },
       { id: 'settings', label: 'Go to Settings', hint: 'repos, team, prefs', Icon: Settings, run: () => navigate('/settings') },
